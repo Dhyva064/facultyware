@@ -23,11 +23,21 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Session configuration
+// OPSI 2 Terpasang: Menggunakan tabel express_sessions otomatis
 const sessionStore = new MySQLStore({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  createDatabaseTable: true, // TRUE agar tabel otomatis dibikin kalau belum ada
+  schema: {
+      tableName: 'express_sessions', // Memakai tabel baru khusus untuk session Express
+      columnNames: {
+          session_id: 'session_id',
+          expires: 'expires',
+          data: 'data'
+      }
+  }
 });
 
 app.use(session({

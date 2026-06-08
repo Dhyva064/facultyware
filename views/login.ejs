@@ -4,48 +4,16 @@
     <script>
       (() => {
         try {
-          const stored = localStorage.getItem("themeMode");
-          if (
-            stored
-              ? stored === "dark"
-              : matchMedia("(prefers-color-scheme: dark)").matches
-          ) {
-            document.documentElement.classList.add("dark");
-          }
-        } catch (_) {}
+          const stored = localStorage.getItem('themeMode');
+          const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const isDark = stored ? stored === 'dark' : prefersDark;
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch (e) {}
 
-        const apply = (dark) => {
-          document.documentElement.classList.toggle("dark", dark);
-          try {
-            localStorage.setItem("themeMode", dark ? "dark" : "light");
-          } catch (_) {}
-        };
-
-        document.addEventListener("basecoat:theme", (event) => {
-          const mode = event.detail?.mode;
-          apply(
-            mode === "dark"
-              ? true
-              : mode === "light"
-                ? false
-                : !document.documentElement.classList.contains("dark"),
-          );
-        });
-      })();
-    </script>
-
-    <script>
-      (function () {
         try {
-          const storedTheme = localStorage.getItem("themeVariant");
-          if (storedTheme)
-            document.documentElement.classList.add(`theme-${storedTheme}`);
-        } catch (event) {
-          console.error(
-            "Could not apply theme variant from localStorage",
-            event,
-          );
-        }
+          const storedTheme = localStorage.getItem('themeVariant');
+          if (storedTheme) document.documentElement.classList.add(`theme-${storedTheme}`);
+        } catch (e) {}
       })();
     </script>
 
@@ -53,12 +21,12 @@
     <meta http-equiv="Content-Language" content="en" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Basecoat</title>
+    <title>SIMAINT | <%= title || "Login" %></title>
     <meta
       name="description"
       content="A components library built with Tailwind CSS that works with any web stack."
     />
-    <meta name="title" content="Basecoat" />
+    <meta name="title" content="SIMAINT | <%= title || 'Login' %>" />
     <meta
       name="keywords"
       content="components,component library,component system,UI,UI kit,shadcn,shadcn/ui,Tailwind CSS,Tailwind,CSS,HTML,Jinja,Nunjucks,JS,JavaScript,vanilla JS,vanilla JavaScript"
@@ -72,15 +40,6 @@
     />
 
     <link rel="stylesheet" href="/assets/styles.css" />
-
-    <script src="/assets/js/basecoat.js?v=0.3.11" defer></script>
-    <script src="/assets/js/command.js?v=0.3.11" defer></script>
-    <script src="/assets/js/dropdown-menu.js?v=0.3.11" defer></script>
-    <script src="/assets/js/popover.js?v=0.3.11" defer></script>
-    <script src="/assets/js/select.js?v=0.3.11" defer></script>
-    <script src="/assets/js/sidebar.js?v=0.3.11" defer></script>
-    <script src="/assets/js/tabs.js?v=0.3.11" defer></script>
-    <script src="/assets/js/toast.js?v=0.3.11" defer></script>
 
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 
@@ -103,8 +62,8 @@
       }
     </script>
     <script>
-      document.addEventListener("htmx:historyRestore", () => {
-        if (window.basecoat) window.basecoat.initAll();
+      document.addEventListener('htmx:historyRestore', () => {
+        // Keep HTMX history restoration in sync with the current UI state.
       });
     </script>
   </head>
@@ -148,15 +107,16 @@
                     <label
                       data-slot="field-label"
                       class="items-center text-sm font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-[&gt;[data-slot=field]]:w-full has-[&gt;[data-slot=field]]:flex-col has-[&gt;[data-slot=field]]:rounded-md has-[&gt;[data-slot=field]]:border [&amp;&gt;*]:data-[slot=field]:p-4 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10"
-                      for="username"
-                      >Username</label
+                      for="email"
+                      >Email</label
                     ><input
-                      type="text"
-                      name="username"
+                      type="email"
+                      name="email"
+                      id="email"
+                      placeholder="nama@ftiunand.ac.id"
+                      pattern=".+@ftiunand\.ac\.id$"
                       data-slot="input"
                       class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
-                      id="username"
-                      placeholder="admin"
                       required=""
                     />
                   </div>
