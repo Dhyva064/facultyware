@@ -2,9 +2,8 @@ const bcrypt = require("bcryptjs");
 const db = require("../lib/db");
 const { getRoleLabel } = require("../middlewares/roleRedirect");
 
-// Cookie name must match the `key` used in app.js session middleware
+// Menyelaraskan Cookie dengan 'key' di app.js
 const SESSION_COOKIE_NAME = "session_cookie_name";
-
 const ROLE_MODEL_TYPE = "App\\Models\\User";
 
 // 1. GET Landing Page (/)
@@ -30,8 +29,10 @@ const loginPage = (req, res) => {
 
 // 3. POST Login (/login)
 const login = async (req, res, next) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
+  // Form login.ejs menggunakan name="username", bukan name="email"
+  const email = String(req.body.email || req.body.username || "").trim().toLowerCase();
   const password = String(req.body.password || "");
+
 
   if (!email || !password) {
     return res.render("login", {
@@ -47,6 +48,7 @@ const login = async (req, res, next) => {
     });
   }
 
+  //Query Gabungan Data User dan Role dari model_has_roles
   try {
     const [rows] = await db.query(
       `
@@ -98,6 +100,7 @@ const login = async (req, res, next) => {
     return req.session.regenerate(function (err) {
       if (err) return next(err);
 
+      // Variabel Sesi yang dibutuhkan Dashboard
       req.session.userId = user.id;
       req.session.username = user.name || "User SIMAINT";
       req.session.userEmail = user.email;
@@ -123,7 +126,7 @@ const logout = (req, res, next) => {
       return next(err);
     }
 
-    // Clear cookie using the configured session cookie name
+    // Menghapus Cookie dibrowser
     res.clearCookie(SESSION_COOKIE_NAME);
     return res.redirect("/login");
   });

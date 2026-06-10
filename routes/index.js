@@ -5,17 +5,22 @@ const indexController = require("../controllers/indexController");
 const dashboardController = require("../controllers/dashboardController");
 const { isAuthenticated } = require("../middlewares/auth");
 
-// Halaman depan statis default 
+const { roleRedirect } = require("../middlewares/roleRedirect");
+
+// Halaman depan statis default ( Landing Page )
 router.get("/", indexController.index);
 
-// Halaman utama sistem (Hanya bisa dibuka jika sudah login)
 router.get("/home", isAuthenticated, dashboardController.home);
 
-// Halaman login
+// Halaman login (Tampilan Form)
 router.get("/login", indexController.loginPage);
+// Eksekusi Login (Pencocokan username, password, dan mhr.model_type)
 router.post("/login", indexController.login);
 
-// Proses logout
+// Proses memusnahkan session (Destroy Session)
 router.get("/logout", indexController.logout);
+
+// Mengarahkan role secara aman ke rute tujuan utama masing-masing melalui middleware roleRedirect.
+router.get('/auth/role-redirect', isAuthenticated, roleRedirect);
 
 module.exports = router;

@@ -1,3 +1,154 @@
-<h1><%= message %></h1>
-<h2><%= error.status %></h2>
-<pre><%= error.stack %></pre>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Error <%= error.status %> — SIMAINT FTI Unand</title>
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      background: #f8fafc; 
+      color: #0f172a;
+      padding: 24px;
+    }
+    
+    .error-card {
+      text-align: center;
+      max-width: 520px;
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 40px 32px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    }
+    
+    .error-code {
+      font-size: 72px; 
+      font-weight: 800; 
+      line-height: 1;
+      color: #2563eb;
+      margin-bottom: 16px;
+    }
+    
+    .error-title { 
+      font-size: 20px; 
+      font-weight: 700; 
+      color: #0f172a; 
+      margin-bottom: 12px; 
+    }
+    
+    .error-message { 
+      font-size: 14px; 
+      color: #475569; 
+      line-height: 1.6; 
+      margin-bottom: 24px; 
+    }
+
+    .stack-wrapper {
+      text-align: left;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 32px;
+      overflow-x: auto;
+      max-height: 200px;
+    }
+
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      color: #dc2626; 
+      white-space: pre-wrap;
+    }
+    
+    .btn-wrap { 
+      display: flex; 
+      gap: 12px; 
+      justify-content: center; 
+      flex-wrap: wrap; 
+    }
+    
+    .btn { 
+      display: inline-flex; 
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px; 
+      border-radius: 8px; 
+      font-size: 14px; 
+      font-weight: 600; 
+      text-decoration: none; 
+      cursor: pointer; 
+      border: none; 
+      transition: background-color 0.2s, transform 0.1s; 
+    }
+    
+    .btn-primary { 
+      background: #2563eb; 
+      color: #ffffff; 
+    }
+    
+    .btn-primary:hover { 
+      background: #1d4ed8; 
+    }
+    
+    .btn-secondary { 
+      background: #ffffff; 
+      color: #334155; 
+      border: 1px solid #cbd5e1; 
+    }
+    
+    .btn-secondary:hover { 
+      background: #f1f5f9; 
+    }
+  </style>
+</head>
+<body>
+
+  <div class="error-card">
+    <div class="error-code"><%= error.status %></div>
+    
+    <div class="error-title">
+      <% if (error.status == 403) { %>Akses Ditolak
+      <% } else if (error.status == 404) { %>Halaman Tidak Ditemukan
+      <% } else if (error.status == 500) { %>Kesalahan Internal Server
+      <% } else { %>Terjadi Masalah Sistem<% } %>
+    </div>
+    
+    <div class="error-message">
+      Pesan Sistem: "<%= message %>"
+    </div>
+    
+    <% if (error.stack) { %>
+      <div class="stack-wrapper">
+        <pre><%= error.stack %></pre>
+      </div>
+    <% } %>
+    
+    <div class="btn-wrap">
+      <a href="javascript:void(0)" id="btnBack" class="btn btn-secondary">← Kembali</a>
+      <a href="/login" class="btn btn-primary">Ke Halaman Login</a>
+    </div>
+  </div>
+
+  <script>
+    var btnBack = document.getElementById('btnBack');
+    btnBack.addEventListener('click', function() {
+      if (document.referrer && document.referrer !== window.location.href) {
+        history.back();
+      } else {
+        window.location.href = '/login';
+      }
+    });
+  </script>
+  
+</body>
+</html>

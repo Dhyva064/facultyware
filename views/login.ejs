@@ -1,16 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <script>
       (() => {
         try {
-          const stored = localStorage.getItem('themeMode');
-          const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          const isDark = stored ? stored === 'dark' : prefersDark;
-          if (isDark) document.documentElement.classList.add('dark');
-        } catch (e) {}
-
-        try {
+          localStorage.setItem("themeMode", "light");
           const storedTheme = localStorage.getItem('themeVariant');
           if (storedTheme) document.documentElement.classList.add(`theme-${storedTheme}`);
         } catch (e) {}
@@ -18,15 +12,15 @@
     </script>
 
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Language" content="en" />
+    <meta http-equiv="Content-Language" content="id" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>SIMAINT | <%= title || "Login" %></title>
+    <title>Masuk — Sistem Maintenance Alat</title>
     <meta
       name="description"
-      content="A components library built with Tailwind CSS that works with any web stack."
+      content="Sistem Maintenance Alat FTI Universitas Andalas"
     />
-    <meta name="title" content="SIMAINT | <%= title || 'Login' %>" />
+    <meta name="title" content="Sistem Maintenance Alat" />
     <meta
       name="keywords"
       content="components,component library,component system,UI,UI kit,shadcn,shadcn/ui,Tailwind CSS,Tailwind,CSS,HTML,Jinja,Nunjucks,JS,JavaScript,vanilla JS,vanilla JavaScript"
@@ -40,6 +34,15 @@
     />
 
     <link rel="stylesheet" href="/assets/styles.css" />
+
+    <script src="/assets/js/basecoat.js?v=0.3.11" defer></script>
+    <script src="/assets/js/command.js?v=0.3.11" defer></script>
+    <script src="/assets/js/dropdown-menu.js?v=0.3.11" defer></script>
+    <script src="/assets/js/popover.js?v=0.3.11" defer></script>
+    <script src="/assets/js/select.js?v=0.3.11" defer></script>
+    <script src="/assets/js/sidebar.js?v=0.3.11" defer></script>
+    <script src="/assets/js/tabs.js?v=0.3.11" defer></script>
+    <script src="/assets/js/toast.js?v=0.3.11" defer></script>
 
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 
@@ -63,7 +66,7 @@
     </script>
     <script>
       document.addEventListener('htmx:historyRestore', () => {
-        // Keep HTMX history restoration in sync with the current UI state.
+        if (window.basecoat) window.basecoat.initAll();
       });
     </script>
   </head>
@@ -86,15 +89,20 @@
                   class="group/field-group @container/field-group flex w-full flex-col gap-7 data-[slot=checkbox-group]:gap-3 [&amp;&gt;[data-slot=field-group]]:gap-4"
                 >
                   <div class="flex flex-col items-center gap-2 text-center">
-                    <h1 class="text-2xl font-bold">Welcome back</h1>
-                    <p class="text-balance text-muted-foreground">
-                      Login to your account
-                    </p>
+                    <h1 class="text-3xl font-bold tracking-tight text-foreground">Selamat Datang</h1>
+                    <div class="text-sm text-muted-foreground flex flex-col gap-0.5">
+                      <span class="font-medium text-foreground">Sistem Maintenance Alat</span>
+                      <span>Fakultas Teknologi Informasi</span>
+                    </div>
                   </div>
                   
-                  <% if (error) { %>
+                  <% if (typeof error !== 'undefined' && error) { %>
                     <div class="bg-destructive/15 text-destructive text-sm p-3 rounded-md border border-destructive/20 text-center">
                       <%= error %>
+                    </div>
+                  <% } else if (typeof errors !== 'undefined' && errors && errors.length > 0) { %>
+                    <div class="bg-destructive/15 text-destructive text-sm p-3 rounded-md border border-destructive/20 text-center">
+                      <%= errors[0] %>
                     </div>
                   <% } %>
 
@@ -106,20 +114,19 @@
                   >
                     <label
                       data-slot="field-label"
-                      class="items-center text-sm font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-[&gt;[data-slot=field]]:w-full has-[&gt;[data-slot=field]]:flex-col has-[&gt;[data-slot=field]]:rounded-md has-[&gt;[data-slot=field]]:border [&amp;&gt;*]:data-[slot=field]:p-4 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10"
-                      for="email"
-                      >Email</label
+                      class="items-center text-sm font-semibold select-none leading-none"
+                      for="username"
+                      >Email Institusi</label
                     ><input
-                      type="email"
+                      type="text"
                       name="email"
-                      id="email"
-                      placeholder="nama@ftiunand.ac.id"
-                      pattern=".+@ftiunand\.ac\.id$"
+                      id="username"
+                      placeholder="email@ftiunand.ac.id"
                       data-slot="input"
                       class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                       required=""
                     />
-                  </div>
+                    </div>
                   <div
                     role="group"
                     data-slot="field"
@@ -129,21 +136,18 @@
                     <div class="flex items-center">
                       <label
                         data-slot="field-label"
-                        class="items-center text-sm font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-[&gt;[data-slot=field]]:w-full has-[&gt;[data-slot=field]]:flex-col has-[&gt;[data-slot=field]]:rounded-md has-[&gt;[data-slot=field]]:border [&amp;&gt;*]:data-[slot=field]:p-4 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10"
+                        class="items-center text-sm font-semibold select-none leading-none"
                         for="password"
-                        >Password</label
-                      ><a
-                        href="#"
-                        class="ml-auto text-sm underline-offset-2 hover:underline"
-                        >Forgot your password?</a
+                        >Kata Sandi</label
                       >
-                    </div>
+                      </div>
                     <input
                       type="password"
                       name="password"
                       data-slot="input"
                       class="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40"
                       id="password"
+                      placeholder="Masukkan kata sandi"
                       required=""
                     />
                   </div>
@@ -157,18 +161,18 @@
                       data-slot="button"
                       data-variant="default"
                       data-size="default"
-                      class="inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[&gt;svg]:px-3"
+                      class="inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-semibold whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[&gt;svg]:px-3"
                       type="submit"
                     >
-                      Login
+                      Masuk ke Sistem
                     </button>
                   </div>
 
                   <p
                     data-slot="field-description"
-                    class="text-sm leading-normal font-normal text-muted-foreground group-has-[[data-orientation=horizontal]]/field:text-balance last:mt-0 nth-last-2:-mt-1 [[data-variant=legend]+&amp;]:-mt-1.5 [&amp;&gt;a]:underline [&amp;&gt;a]:underline-offset-4 [&amp;&gt;a:hover]:text-primary text-center"
+                    class="text-xs text-muted-foreground text-center"
                   >
-                    Don't have an account? <a href="#">Sign up</a>
+                    Akun diberikan oleh administrator sistem.
                   </p>
                 </div>
               </form>
@@ -183,11 +187,9 @@
           </div>
           <p
             data-slot="field-description"
-            class="text-sm leading-normal font-normal text-muted-foreground group-has-[[data-orientation=horizontal]]/field:text-balance last:mt-0 nth-last-2:-mt-1 [[data-variant=legend]+&amp;]:-mt-1.5 [&amp;&gt;a]:underline [&amp;&gt;a]:underline-offset-4 [&amp;&gt;a:hover]:text-primary px-6 text-center"
+            class="text-xs text-muted-foreground text-center"
           >
-            By clicking continue, you agree to our
-            <a href="#">Terms of Service</a>
-            <!-- -->and <a href="#">Privacy Policy</a>.
+            Dengan masuk ke sistem, Anda menyetujui <a href="#" class="underline">Syarat Layanan</a> dan <a href="#" class="underline">Kebijakan Privasi</a> kami.
           </p>
         </div>
       </div>

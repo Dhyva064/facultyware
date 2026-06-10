@@ -4,79 +4,227 @@
     <meta charset="utf-8" />
     <meta http-equiv="Content-Language" content="id" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- [SIMAINT] Judul disesuaikan -->
     <title><%= pageTitle || "SIMAINT Dashboard" %></title>
+
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/assets/styles.css" />
+
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
   </head>
+
   <body class="bg-background text-foreground">
     <div class="flex min-h-screen flex-col bg-muted/30 lg:flex-row">
+
+      <!-- SIDEBAR -->
       <aside class="border-b bg-card px-5 py-6 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
         <div class="flex h-full flex-col gap-6">
+
+          <!-- [SIMAINT] Branding aplikasi -->
           <a href="/home" class="flex items-center gap-3 rounded-xl border bg-background px-4 py-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
               S
             </div>
+
             <div class="min-w-0">
-              <p class="truncate text-sm font-semibold">SIMAINT FTI</p>
-              <p class="truncate text-xs text-muted-foreground"><%= roleLabel || "Dashboard" %></p>
+              <p class="truncate text-sm font-semibold">
+                SIMAINT FTI
+              </p>
+
+              <p class="truncate text-xs text-muted-foreground">
+                <%= roleLabel || "Dashboard" %>
+              </p>
             </div>
           </a>
 
+          <!-- MENU -->
           <nav class="space-y-2 text-sm">
-            <a href="/home" class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
+
+            <a href="/home"
+              class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
               Dashboard
             </a>
-            <a href="/logout" class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-              Logout
-            </a>
-          </nav>
 
+            <!-- [SIMAINT - BARU] Menu khusus Penanggung Jawab -->
+            <% if(roleLabel==="Penanggung Jawab" ) { %>
+
+              <a href="/maintenance"
+                class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
+                Permohonan Maintenance
+              </a>
+
+              <a href="/maintenance/history"
+                class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
+                Riwayat Maintenance
+              </a>
+
+              <% } %>
+
+                <!-- [SIMAINT - BARU] Menu Pengelola Aset -->
+                <% if(roleLabel==="Pengelola Aset" ) { %>
+
+                  <a href="/progress"
+                    class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
+                    Progress Perbaikan
+                  </a>
+
+                  <% } %>
+
+                    <!-- [SIMAINT - BARU] Menu Pengguna -->
+                    <% if(roleLabel==="Pengguna" ) { %>
+
+                      <a href="/laporan"
+                        class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
+                        Laporan Kerusakan
+                      </a>
+
+                      <% } %>
+
+                        <a href="/logout"
+                          class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
+                          Logout
+                        </a>
+          </nav>
+         
+          <!-- USER CARD -->        
           <div class="mt-auto rounded-xl border bg-background p-4 text-sm">
-            <p class="font-semibold"><%= user %></p>
-            <p class="mt-1 text-muted-foreground"><%= userEmail %></p>
+
+            <p class="font-semibold">
+              <%= user %>
+            </p>
+
+            <p class="mt-1 text-muted-foreground">
+              <%= userEmail %>
+            </p>
+
             <p class="mt-3 inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
               <%= roleLabel %>
             </p>
+
           </div>
         </div>
       </aside>
 
+      <!-- MAIN CONTENT -->     
       <div class="flex min-w-0 flex-1 flex-col">
+
+        <!-- HEADER -->
         <header class="border-b bg-card px-5 py-4 lg:px-8">
+
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
             <div>
+
               <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                 SIMAINT Dashboard
               </p>
+
               <h1 class="mt-1 text-2xl font-bold tracking-tight">
                 Selamat datang, <%= user %>
               </h1>
+
               <p class="mt-1 text-sm text-muted-foreground">
                 <%= roleSummary || "Dashboard sesuai role pengguna." %>
               </p>
+
             </div>
+
             <div class="flex items-center gap-3">
+
               <span class="inline-flex rounded-full border bg-muted px-3 py-1 text-sm font-medium">
                 <%= roleLabel %>
               </span>
-              <a href="/logout" class="inline-flex rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">
+
+              <a href="/logout"
+                class="inline-flex rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">
                 Logout
               </a>
+
             </div>
           </div>
         </header>
 
+        <!-- CONTENT -->
         <main class="flex-1 p-5 lg:p-8">
+
+          <!-- [SIMAINT] CARD ROLE AKTIF -->
           <section class="mb-6 rounded-2xl border bg-card p-6 shadow-sm">
+
             <div class="flex flex-col gap-2">
-              <p class="text-sm font-medium text-muted-foreground">Role aktif</p>
-              <h2 class="text-xl font-semibold"><%= roleLabel %></h2>
+
+              <p class="text-sm font-medium text-muted-foreground">
+                Role aktif
+              </p>
+
+              <h2 class="text-xl font-semibold">
+                <%= roleLabel %>
+              </h2>
+
             </div>
+
           </section>
 
-          <%- include((typeof dashboardView !== "undefined" && dashboardView) ? dashboardView : "pengguna/index") %>
+          <!-- [SIMAINT - BARU] Ringkasan Dashboard PJ -->
+          <!-- Hanya tampil jika role PJ -->
+          <% if(roleLabel==="Penanggung Jawab" ) { %>
+
+            <section class="mb-6 grid gap-4 md:grid-cols-3">
+
+              <div class="rounded-xl border bg-card p-5">
+                <p class="text-sm text-muted-foreground">
+                  Menunggu Verifikasi
+                </p>
+                <h3 class="mt-2 text-3xl font-bold">
+                  <%= waitingCount || 0 %>
+                </h3>
+              </div>
+
+              <div class="rounded-xl border bg-card p-5">
+                <p class="text-sm text-muted-foreground">
+                  Sedang Diproses
+                </p>
+                <h3 class="mt-2 text-3xl font-bold">
+                  <%= progressCount || 0 %>
+                </h3>
+              </div>
+
+              <div class="rounded-xl border bg-card p-5">
+                <p class="text-sm text-muted-foreground">
+                  Selesai
+                </p>
+                <h3 class="mt-2 text-3xl font-bold">
+                  <%= completedCount || 0 %>
+                </h3>
+              </div>
+
+            </section>
+
+            <% } %>
+              
+              <!-- VIEW DASHBOARD SESUAI ROLE -->
+              <%- include(
+                (typeof dashboardView !=="undefined" && dashboardView)
+                ? dashboardView
+                : "pengguna/index"
+                ) %>
+
         </main>
       </div>
     </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+
+      });
+    </script>
+
   </body>
 </html>
