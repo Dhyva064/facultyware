@@ -42,7 +42,7 @@ async function buildDashboardViewModel(req) {
   let recentLaporan    = [];
   const currentFilter  = req.query.filter === 'my' ? 'my' : 'all';
 
-  if (roleName === 'penanggung_jawab') {
+  if (String(roleName || "").trim().toLowerCase().replace(/\s+/g, "_") === 'penanggung_jawab') {
     // Cari employee_id dari user ini
     const [[emp]] = await db.query(
       'SELECT id FROM employees WHERE id = ? LIMIT 1', [userId]
@@ -136,6 +136,7 @@ async function buildDashboardViewModel(req) {
     title:         `SIMAINT | ${roleConfig.label}`,
     pageTitle:     `SIMAINT | ${roleConfig.label}`,
     user:          user.name || req.session.username || "User SIMAINT",
+    userName:      user.name || req.session.username || "User SIMAINT",
     userEmail:     user.email || req.session.userEmail,
     userRole:      roleName,
     roleLabel:     getRoleLabel(roleName),

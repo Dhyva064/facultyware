@@ -18,11 +18,16 @@ try {
 // Impor Middleware
 const authModule = require('../../middlewares/auth');
 const { isAuthenticated } = authModule;
-const checkPermission = authModule.checkPermission || authModule;
+// Gunakan fallback agar tidak crash jika acl belum ada
+const checkPermission = authModule.checkPermission || ((role) => (req, res, next) => next());
 
 router.use(isAuthenticated);
 
-// DAFTAR ROUTE AKSI MAINTENANCE 
+router.use((req, res, next) => {
+  if (req.session.userRole === 'penanggung_jawab') return next();
+  return res.redirect('/home');
+});
+
 // GET  /PJ/MAINTENANCE — Menampilkan list permohonan perbaikan alat yang sedang berjalan
 router.get('/',
   checkPermission('maintenance.view'),

@@ -1,230 +1,288 @@
-<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Language" content="id" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+<%#
+  PERUBAHAN UTAMA home.ejs:
+  1. Buang layout Tailwind lama (sidebar + border tebal terpisah).
+  2. Pakai partial header/footer yang SAMA dengan /laporan dan /maintenance
+     agar sidebar, tipografi, tombol, dan card seragam (Gambar 1).
+  3. Semua komponen dashboard PJ ditulis langsung di sini — tanpa pj/index.ejs.
+%>
+<%- include('partials/header', {
+  title:       'Dashboard',
+  currentPath: '/home',
+  userRole:    typeof userRole !== 'undefined' ? userRole : '',
+  userName:    typeof userName !== 'undefined' ? userName : (typeof user !== 'undefined' ? user : ''),
+  flash:       typeof flash !== 'undefined' ? flash : null
+}) %>
 
-    <!-- [SIMAINT] Judul disesuaikan -->
-    <title><%= pageTitle || "SIMAINT Dashboard" %></title>
+<%
+  /* Variabel data dari dashboardController */
+  const _role          = typeof userRole !== 'undefined' ? userRole : '';
+  const _stats         = typeof stats !== 'undefined' ? stats : {};
+  const _recent        = typeof recentLaporan !== 'undefined' ? recentLaporan : [];
+  const _topAset       = typeof topAset !== 'undefined' ? topAset : [];
+  const _filter        = typeof currentFilter !== 'undefined' ? currentFilter : 'all';
+  const _totalCount    = typeof totalCount !== 'undefined' ? totalCount : 0;
+  const _maintCount    = typeof maintenanceCount !== 'undefined' ? maintenanceCount : 0;
+  const _roleSummary   = typeof roleSummary !== 'undefined' ? roleSummary : 'Dashboard SIMAINT.';
 
-    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
-    <link rel="stylesheet" href="/assets/styles.css" />
+  const STATUS_INFO = {
+    reported:    { text: 'Dilaporkan', cls: 'status-reported' },
+    in_progress: { text: 'Diproses',   cls: 'status-in_progress' },
+    resolved:    { text: 'Selesai',    cls: 'status-resolved' },
+  };
 
-    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-  </head>
+  function fmtDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function trunc(s, n) {
+    if (!s) return '-';
+    return s.length > n ? s.substring(0, n) + '…' : s;
+  }
+%>
 
-  <body class="bg-background text-foreground">
-    <div class="flex min-h-screen flex-col bg-muted/30 lg:flex-row">
+<!-- Gaya dashboard: card modern tanpa border tebal, hanya soft shadow (selaras Gambar 1) -->
+<style>
+  .dash-stat {
+    border: none;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  }
+  .dash-stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    margin-bottom: 6px;
+  }
+  .dash-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .dash-panel {
+    border: none;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  }
+  .dash-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background .15s;
+  }
+  .dash-filter-btn.active {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .dash-filter-btn.inactive {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+  .dash-filter-btn.inactive:hover { opacity: .85; }
+</style>
 
-      <!-- SIDEBAR -->
-      <aside class="border-b bg-card px-5 py-6 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
-        <div class="flex h-full flex-col gap-6">
+<!-- Judul halaman — pola sama dengan Daftar Laporan / Maintenance -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Dashboard</h1>
+    <p style="font-size:13px;color:var(--muted-foreground);">
+      <%= _roleSummary %>
+    </p>
+  </div>
 
-          <!-- [SIMAINT] Branding aplikasi -->
-          <a href="/home" class="flex items-center gap-3 rounded-xl border bg-background px-4 py-3">
-            <div
-              class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              S
-            </div>
+  <% if (_role === 'penanggung_jawab') { %>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="/laporan" class="btn" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+      </svg>
+      Daftar Laporan
+    </a>
+    <a href="/maintenance/buat" class="btn-outline" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;text-decoration:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Buat Permohonan
+    </a>
+  </div>
+  <% } %>
+</div>
 
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold">
-                SIMAINT FTI
-              </p>
+<% if (_role === 'penanggung_jawab') { %>
+<%#
+  === DASHBOARD PENANGGUNG JAWAB (inline, tanpa partial terpisah) ===
+%>
 
-              <p class="truncate text-xs text-muted-foreground">
-                <%= roleLabel || "Dashboard" %>
-              </p>
-            </div>
-          </a>
+<!-- Filter cepat: Semua vs Laporan saya -->
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+  <a href="/home?filter=all" class="dash-filter-btn <%= _filter === 'all' ? 'active' : 'inactive' %>">Semua Laporan</a>
+  <a href="/home?filter=my"  class="dash-filter-btn <%= _filter === 'my'  ? 'active' : 'inactive' %>">Laporan Saya</a>
+</div>
 
-          <!-- MENU -->
-          <nav class="space-y-2 text-sm">
+<!-- Kartu statistik — grid responsif, tanpa border kaku -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px;">
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Total Laporan</p>
+    <p class="dash-stat-value"><%= _stats.totalLaporan || 0 %></p>
+  </div>
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Menunggu Verifikasi</p>
+    <p class="dash-stat-value" style="color:#a16207;"><%= _stats.menunggu || 0 %></p>
+  </div>
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Sedang Diproses</p>
+    <p class="dash-stat-value" style="color:#1d4ed8;"><%= _stats.dalamPengerjaan || 0 %></p>
+  </div>
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Selesai Bulan Ini</p>
+    <p class="dash-stat-value" style="color:#15803d;"><%= _stats.selesaiBulanIni || 0 %></p>
+  </div>
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Maintenance Aktif</p>
+    <p class="dash-stat-value"><%= _maintCount || 0 %></p>
+  </div>
+</div>
 
-            <a href="/home"
-              class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-              Dashboard
-            </a>
+<div style="display:grid;grid-template-columns:1fr;gap:20px;">
+  <% if (typeof trendLabels !== 'undefined' && typeof trendJumlah !== 'undefined') { %>
+  <!-- Grafik tren 7 hari -->
+  <div class="card dash-panel">
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:16px;">Tren Laporan (7 Hari Terakhir)</h2>
+    <canvas id="dashTrendChart" height="80"></canvas>
+  </div>
+  <% } %>
 
-            <!-- [SIMAINT - BARU] Menu khusus Penanggung Jawab -->
-            <% if(roleLabel==="Penanggung Jawab" ) { %>
-
-              <a href="/maintenance"
-                class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-                Permohonan Maintenance
-              </a>
-
-              <a href="/maintenance/history"
-                class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-                Riwayat Maintenance
-              </a>
-
-              <% } %>
-
-                <!-- [SIMAINT - BARU] Menu Pengelola Aset -->
-                <% if(roleLabel==="Pengelola Aset" ) { %>
-
-                  <a href="/progress"
-                    class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-                    Progress Perbaikan
-                  </a>
-
-                  <% } %>
-
-                    <!-- [SIMAINT - BARU] Menu Pengguna -->
-                    <% if(roleLabel==="Pengguna" ) { %>
-
-                      <a href="/laporan"
-                        class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-                        Laporan Kerusakan
-                      </a>
-
-                      <% } %>
-
-                        <a href="/logout"
-                          class="flex items-center rounded-lg px-3 py-2 font-medium hover:bg-muted">
-                          Logout
-                        </a>
-          </nav>
-         
-          <!-- USER CARD -->        
-          <div class="mt-auto rounded-xl border bg-background p-4 text-sm">
-
-            <p class="font-semibold">
-              <%= user %>
-            </p>
-
-            <p class="mt-1 text-muted-foreground">
-              <%= userEmail %>
-            </p>
-
-            <p class="mt-3 inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-              <%= roleLabel %>
-            </p>
-
-          </div>
-        </div>
-      </aside>
-
-      <!-- MAIN CONTENT -->     
-      <div class="flex min-w-0 flex-1 flex-col">
-
-        <!-- HEADER -->
-        <header class="border-b bg-card px-5 py-4 lg:px-8">
-
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-
-            <div>
-
-              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                SIMAINT Dashboard
-              </p>
-
-              <h1 class="mt-1 text-2xl font-bold tracking-tight">
-                Selamat datang, <%= user %>
-              </h1>
-
-              <p class="mt-1 text-sm text-muted-foreground">
-                <%= roleSummary || "Dashboard sesuai role pengguna." %>
-              </p>
-
-            </div>
-
-            <div class="flex items-center gap-3">
-
-              <span class="inline-flex rounded-full border bg-muted px-3 py-1 text-sm font-medium">
-                <%= roleLabel %>
-              </span>
-
-              <a href="/logout"
-                class="inline-flex rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">
-                Logout
-              </a>
-
-            </div>
-          </div>
-        </header>
-
-        <!-- CONTENT -->
-        <main class="flex-1 p-5 lg:p-8">
-
-          <!-- [SIMAINT] CARD ROLE AKTIF -->
-          <section class="mb-6 rounded-2xl border bg-card p-6 shadow-sm">
-
-            <div class="flex flex-col gap-2">
-
-              <p class="text-sm font-medium text-muted-foreground">
-                Role aktif
-              </p>
-
-              <h2 class="text-xl font-semibold">
-                <%= roleLabel %>
-              </h2>
-
-            </div>
-
-          </section>
-
-          <!-- [SIMAINT - BARU] Ringkasan Dashboard PJ -->
-          <!-- Hanya tampil jika role PJ -->
-          <% if(roleLabel==="Penanggung Jawab" ) { %>
-
-            <section class="mb-6 grid gap-4 md:grid-cols-3">
-
-              <div class="rounded-xl border bg-card p-5">
-                <p class="text-sm text-muted-foreground">
-                  Menunggu Verifikasi
-                </p>
-                <h3 class="mt-2 text-3xl font-bold">
-                  <%= waitingCount || 0 %>
-                </h3>
-              </div>
-
-              <div class="rounded-xl border bg-card p-5">
-                <p class="text-sm text-muted-foreground">
-                  Sedang Diproses
-                </p>
-                <h3 class="mt-2 text-3xl font-bold">
-                  <%= progressCount || 0 %>
-                </h3>
-              </div>
-
-              <div class="rounded-xl border bg-card p-5">
-                <p class="text-sm text-muted-foreground">
-                  Selesai
-                </p>
-                <h3 class="mt-2 text-3xl font-bold">
-                  <%= completedCount || 0 %>
-                </h3>
-              </div>
-
-            </section>
-
-            <% } %>
-              
-              <!-- VIEW DASHBOARD SESUAI ROLE -->
-              <%- include(
-                (typeof dashboardView !=="undefined" && dashboardView)
-                ? dashboardView
-                : "pengguna/index"
-                ) %>
-
-        </main>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;">
+    <!-- Laporan terbaru -->
+    <div class="card dash-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h2 style="font-size:15px;font-weight:700;">Laporan Terbaru</h2>
+        <a href="/laporan" style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;">Lihat semua →</a>
       </div>
+      <% if (_recent.length === 0) { %>
+        <p style="font-size:13px;color:var(--muted-foreground);text-align:center;padding:24px 0;">Belum ada laporan.</p>
+      <% } else { %>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--muted-foreground);">Alat</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--muted-foreground);">Status</th>
+                <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--muted-foreground);">Tanggal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% _recent.forEach(function(l) {
+                const si = STATUS_INFO[l.status] || { text: l.status, cls: '' };
+              %>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px;">
+                  <a href="/laporan/<%= l.id %>" style="font-weight:600;color:var(--foreground);text-decoration:none;"><%= trunc(l.equipment_name, 28) %></a>
+                  <div style="font-size:11px;color:var(--muted-foreground);margin-top:2px;"><%= trunc(l.issue_description, 40) %></div>
+                </td>
+                <td style="padding:10px;">
+                  <span class="status-badge <%= si.cls %>"><%= si.text %></span>
+                </td>
+                <td style="padding:10px;color:var(--muted-foreground);white-space:nowrap;"><%= fmtDate(l.reported_at) %></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
     </div>
 
-    <script>
-      document.addEventListener("DOMContentLoaded", function () {
+    <!-- Aset sering rusak -->
+    <div class="card dash-panel">
+      <h2 style="font-size:15px;font-weight:700;margin-bottom:16px;">Aset Sering Rusak</h2>
+      <% if (_topAset.length === 0) { %>
+        <p style="font-size:13px;color:var(--muted-foreground);text-align:center;padding:24px 0;">Belum ada data.</p>
+      <% } else { %>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <% _topAset.forEach(function(a) { %>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--muted);">
+            <div>
+              <p style="font-size:13px;font-weight:600;"><%= a.nama_aset %></p>
+              <p style="font-size:11px;color:var(--muted-foreground);"><%= a.kode_aset %></p>
+            </div>
+            <span style="font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--background);"><%= a.jumlah_rusak %>×</span>
+          </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
 
-        if (typeof lucide !== 'undefined') {
-          lucide.createIcons();
+<% if (typeof trendLabels !== 'undefined' && typeof trendJumlah !== 'undefined') { %>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const el = document.getElementById('dashTrendChart');
+    if (!el || typeof Chart === 'undefined') return;
+    new Chart(el, {
+      type: 'line',
+      data: {
+        labels: <%- trendLabels %>,
+        datasets: [{
+          label: 'Jumlah Laporan',
+          data: <%- trendJumlah %>,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37,99,235,0.08)',
+          tension: 0.35,
+          fill: true,
+          pointRadius: 4,
+          pointBackgroundColor: '#2563eb'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
+          x: { grid: { display: false } }
         }
+      }
+    });
+  });
+</script>
+<% } %>
 
-      });
-    </script>
+<% } else if (_role === 'pengelola_aset') { %>
+<%# Dashboard Pengelola Aset — card minimalis seragam %>
 
-  </body>
-</html>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Pengelola Aset</p>
+    <p style="font-size:16px;font-weight:600;margin-top:4px;">Master Data Aset</p>
+    <p style="font-size:13px;color:var(--muted-foreground);margin-top:8px;line-height:1.5;">Kelola data aset, distribusi, dan pemantauan status perbaikan.</p>
+  </div>
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Operasional</p>
+    <p style="font-size:16px;font-weight:600;margin-top:4px;">Monitoring Distribusi</p>
+    <p style="font-size:13px;color:var(--muted-foreground);margin-top:8px;line-height:1.5;">Modul pengelola aset akan ditambahkan pada tahap berikutnya.</p>
+  </div>
+</div>
+
+<% } else { %>
+<%# Dashboard Pengguna — card minimalis seragam %>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Pengguna</p>
+    <p style="font-size:16px;font-weight:600;margin-top:4px;">Ringkasan Akun</p>
+    <p style="font-size:13px;color:var(--muted-foreground);margin-top:8px;line-height:1.5;">Dashboard pengguna akan ditambahkan bertahap sesuai kebutuhan fitur.</p>
+  </div>
+  <div class="card dash-stat">
+    <p class="dash-stat-label">Aksi Cepat</p>
+    <p style="font-size:16px;font-weight:600;margin-top:4px;">Buat Laporan Aset</p>
+    <p style="font-size:13px;color:var(--muted-foreground);margin-top:8px;line-height:1.5;">Laporkan kerusakan peralatan laboratorium di unit Anda.</p>
+  </div>
+</div>
+
+<% } %>
+
+<%- include('partials/footer') %>

@@ -17,7 +17,7 @@ async function getEmployeeId(userId) {
 // ── Helper: generate id log baru (MAX+1) ──────────────────────────────────────
 async function nextLogId() {
   const [[{ nid }]] = await db.query(
-    'SELECT COALESCE(MAX(id), 0) + 1 AS nid FROM room_maintenance_request_log'
+    'SELECT COALESCE(MAX(id), 0) + 1 AS nid FROM equipment_maintenance_request_log'
   );
   return nid;
 }
@@ -32,44 +32,43 @@ const index = async (req, res, next) => {
     const page   = Math.max(1, parseInt(req.query.page) || 1);
     const offset = (page - 1) * PAGE_SIZE;
 
-    // Filter: Menampilkan semua status (reported, in_progress, resolved) khusus untuk ruangan yang menjadi tanggung jawab PJ yang sedang login
+    // Filter: Menampilkan semua status (reported, in_progress, resolved) 
     const whereParts = [
-      "rmr.status IN ('in_progress', 'reported', 'resolved')",
-      'r.responsible_employee_id = ?',
+      "emr.status IN ('in_progress', 'reported', 'resolved')"
     ];
-    const params = [pjEmployeeId];
+    const params = [];
 
     if (search) {
-      whereParts.push('r.name LIKE ?');
+      whereParts.push('a.name LIKE ?');
       params.push(`%${search}%`);
     }
     const where = 'WHERE ' + whereParts.join(' AND ');
 
     const [[{ total }]] = await db.query(
       `SELECT COUNT(*) AS total
-       FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       JOIN buildings b ON r.building_id = b.id
-       LEFT JOIN employees e_resp ON rmr.employee_id = e_resp.id
+       FROM equipment_maintenance_requests emr
+       JOIN equipments eq ON emr.equipment_id = eq.id
+       JOIN assets a ON eq.asset_id = a.id
+       LEFT JOIN employees e_resp ON emr.employee_id = e_resp.id
        ${where}`,
       params
     );
 
     const [maintenance] = await db.query(
-      `SELECT rmr.id, r.name AS room_name, b.name AS building_name,
-              rmr.issue_description, rmr.status, rmr.reported_at,
+      `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
+              emr.issue_description, emr.status, emr.reported_at,
               e_resp.name AS pengelola_name,
-              (SELECT COUNT(*) FROM room_maintenance_request_log
-               WHERE room_maintenance_request_id = rmr.id) AS log_count,
-              (SELECT status FROM room_maintenance_request_log
-               WHERE room_maintenance_request_id = rmr.id
+              (SELECT COUNT(*) FROM equipment_maintenance_request_log
+               WHERE equipment_maintenance_request_id = emr.id) AS log_count,
+              (SELECT status FROM equipment_maintenance_request_log
+               WHERE equipment_maintenance_request_id = emr.id
                ORDER BY created_at DESC, id DESC LIMIT 1) = 3 AS has_update
-       FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       JOIN buildings b ON r.building_id = b.id
-       LEFT JOIN employees e_resp ON rmr.employee_id = e_resp.id
+       FROM equipment_maintenance_requests emr
+       JOIN equipments eq ON emr.equipment_id = eq.id
+       JOIN assets a ON eq.asset_id = a.id
+       LEFT JOIN employees e_resp ON emr.employee_id = e_resp.id
        ${where}
-       ORDER BY rmr.reported_at DESC
+       ORDER BY emr.reported_at DESC
        LIMIT ? OFFSET ?`,
       [...params, PAGE_SIZE, offset]
     );
@@ -79,11 +78,11 @@ const index = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('pj/dashboard', {
+    res.render('pj/maintenance/index', { // Changed to point directly to the specific view
       title:       'Permohonan Maintenance',
       currentPath: '/maintenance',
       userRole:    req.session.userRole,
-      userName:    req.session.userName,
+      userName:    req.session.username,
       flash,
       maintenance,
       STATUS_INFO,
@@ -97,26 +96,25 @@ const index = async (req, res, next) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GET /maintenance/buat  — form buat permohonan (laporan dari ruangan tanggung jawab PJ)
+// GET /maintenance/buat  — form buat permohonan
 // ══════════════════════════════════════════════════════════════════════════════
 const create = async (req, res, next) => {
   try {
     const pjEmployeeId = req.session.userId;
 
-    // Ambil daftar laporan 
+    // Ambil daftar laporan yang berstatus reported
     const [laporan] = await db.query(
-      `SELECT rmr.id, r.name AS room_name, rmr.issue_description, rmr.reported_at
-       FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       WHERE rmr.status = 'reported'
-         AND r.responsible_employee_id = ?
-       ORDER BY rmr.reported_at DESC`,
-      [pjEmployeeId]
+      `SELECT emr.id, a.name AS equipment_name, emr.issue_description, emr.reported_at
+       FROM equipment_maintenance_requests emr
+       JOIN equipments eq ON emr.equipment_id = eq.id
+       JOIN assets a ON eq.asset_id = a.id
+       WHERE emr.status = 'reported'
+       ORDER BY emr.reported_at DESC`
     );
 
     const selectedLaporanId = req.query.laporan_id || '';
 
-    res.render('pj/dashboard', {
+    res.render('pj/maintenance/create', { // Changed view path
       title:            'Buat Permohonan Maintenance',
       currentPath:      '/maintenance',
       userRole:         req.session.userRole,
@@ -142,19 +140,18 @@ const store = async (req, res, next) => {
 
   const renderForm = async (errs, old) => {
     const [laporan] = await db.query(
-      `SELECT rmr.id, r.name AS room_name, rmr.issue_description, rmr.reported_at
-       FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       WHERE rmr.status = 'reported'
-         AND r.responsible_employee_id = ?
-       ORDER BY rmr.reported_at DESC`,
-      [pjEmployeeId]
+      `SELECT emr.id, a.name AS equipment_name, emr.issue_description, emr.reported_at
+       FROM equipment_maintenance_requests emr
+       JOIN equipments eq ON emr.equipment_id = eq.id
+       JOIN assets a ON eq.asset_id = a.id
+       WHERE emr.status = 'reported'
+       ORDER BY emr.reported_at DESC`
     );
-    return res.render('pj/dashboard', {
+    return res.render('pj/maintenance/create', { // Changed view path
       title:       'Buat Permohonan Maintenance',
       currentPath: '/maintenance',
       userRole:    req.session.userRole,
-      userName:    req.session.userName,
+      userName:    req.session.username,
       flash:       null,
       laporan,
       errors:      errs,
@@ -167,11 +164,9 @@ const store = async (req, res, next) => {
 
   try {
     const [[laporan]] = await db.query(
-      `SELECT rmr.id FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       WHERE rmr.id = ? AND rmr.status = 'reported'
-         AND r.responsible_employee_id = ?`,
-      [laporan_id, pjEmployeeId]
+      `SELECT emr.id FROM equipment_maintenance_requests emr
+       WHERE emr.id = ? AND emr.status = 'reported'`,
+      [laporan_id]
     );
     if (!laporan) {
       return renderForm(
@@ -199,18 +194,19 @@ const store = async (req, res, next) => {
 
     // 1. Update status laporan awal menjadi 'in_progress' dan kaitkan dengan ID pengelola aset yang ditunjuk otomatis
     await db.query(
-      `UPDATE room_maintenance_requests
+      `UPDATE equipment_maintenance_requests
        SET status = 'in_progress', employee_id = ?, updated_at = NOW()
        WHERE id = ?`,
       [pengelola.id, laporan_id]
     );
 
     // 2. Insert log historis penugasan (status = 1: Created/Dilaporkan)
+    // Catatan: kolom `log` di DB varchar(45) — judul singkat saja; detail ke `description`
     const logId = await nextLogId();
     await db.query(
-      `INSERT INTO room_maintenance_request_log
-          (id, room_maintenance_request_id, log, logged_by, logged_at, status, created_at, updated_at)
-       VALUES (?, ?, 'Permohonan maintenance dibuat otomatis oleh PJ Ruangan', ?, NOW(), 1, NOW(), NOW())`,
+      `INSERT INTO equipment_maintenance_request_log
+          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
+       VALUES (?, ?, 'Permohonan maintenance dibuat', ?, NOW(), 'Permohonan dibuat otomatis oleh Penanggung Jawab', 1, NOW(), NOW())`,
       [logId, laporan_id, pjEmployeeId]
     );
 
@@ -228,34 +224,33 @@ const show = async (req, res, next) => {
     const { id } = req.params;
 
     const [[laporan]] = await db.query(
-      `SELECT rmr.id, rmr.issue_description, rmr.status, rmr.reported_at, rmr.resolved_at,
-              r.name AS room_name, r.code AS room_code,
-              b.name AS building_name,
+      `SELECT emr.id, emr.issue_description, emr.status, emr.reported_at, emr.resolved_at,
+              a.name AS equipment_name, a.code AS equipment_code,
               e_by.name AS reported_by_name,
               e_pengelola.name AS pengelola_name
-       FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       JOIN buildings b ON r.building_id = b.id
-       JOIN employees e_by ON rmr.reported_by = e_by.id
-       LEFT JOIN employees e_pengelola ON rmr.employee_id = e_pengelola.id
-       WHERE rmr.id = ? AND r.responsible_employee_id = ?`,
-      [id, pjEmployeeId]
+       FROM equipment_maintenance_requests emr
+       JOIN equipments eq ON emr.equipment_id = eq.id
+       JOIN assets a ON eq.asset_id = a.id
+       JOIN users e_by ON emr.reported_by = e_by.id
+       LEFT JOIN employees e_pengelola ON emr.employee_id = e_pengelola.id
+       WHERE emr.id = ?`,
+      [id]
     );
 
     if (!laporan) {
       return res.status(404).render('error', {
         message: 'Permohonan tidak ditemukan',
-        error:   { status: 404, stack: 'Permohonan maintenance dengan ID tersebut tidak ada atau bukan dalam wewenang ruangan Anda.' },
+        error:   { status: 404, stack: 'Permohonan maintenance dengan ID tersebut tidak ada.' },
       });
     }
 
     const [logs] = await db.query(
-      `SELECT rmrl.*, e.name AS logged_by_name, ev.name AS verified_by_name
-       FROM room_maintenance_request_log rmrl
-       LEFT JOIN employees e  ON rmrl.logged_by   = e.id
-       LEFT JOIN employees ev ON rmrl.verified_by = ev.id
-       WHERE rmrl.room_maintenance_request_id = ?
-       ORDER BY rmrl.created_at ASC`,
+      `SELECT emrl.*, e.name AS logged_by_name, ev.name AS verified_by_name
+       FROM equipment_maintenance_request_log emrl
+       LEFT JOIN users e  ON emrl.logged_by   = e.id
+       LEFT JOIN users ev ON emrl.verified_by = ev.id
+       WHERE emrl.equipment_maintenance_request_id = ?
+       ORDER BY emrl.created_at ASC`,
       [id]
     );
 
@@ -267,11 +262,11 @@ const show = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('pj/dashboard', {
+    res.render('pj/maintenance/show', { // Changed view path
       title:       `Maintenance #${String(id).padStart(5, '0')}`,
       currentPath: '/maintenance',
       userRole:    req.session.userRole,
-      userName:    req.session.userName,
+      userName:    req.session.username,
       flash,
       laporan,
       logs,
@@ -291,20 +286,19 @@ const close = async (req, res, next) => {
   const { id } = req.params;
   try {
     const [[laporan]] = await db.query(
-      `SELECT rmr.id FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       WHERE rmr.id = ? AND r.responsible_employee_id = ?`,
-      [id, pjEmployeeId]
+      `SELECT emr.id FROM equipment_maintenance_requests emr
+       WHERE emr.id = ?`,
+      [id]
     );
     if (!laporan) {
-      req.session.flash = { type: 'error', message: 'Permohonan tidak ditemukan atau bukan wewenang Anda.' };
+      req.session.flash = { type: 'error', message: 'Permohonan tidak ditemukan.' };
       return res.redirect('/maintenance');
     }
 
-    // Validasi: Status log terakhir wajib bernilai 3 (Pengelola sudah menyatakan selesai/progres rampung) sebelum PJ menutup aplikasi laporan
+    // Validasi: Status log terakhir wajib bernilai 3
     const [latestLogs] = await db.query(
-      `SELECT status FROM room_maintenance_request_log
-       WHERE room_maintenance_request_id = ?
+      `SELECT status FROM equipment_maintenance_request_log
+       WHERE equipment_maintenance_request_id = ?
        ORDER BY created_at DESC, id DESC LIMIT 1`,
       [id]
     );
@@ -319,7 +313,7 @@ const close = async (req, res, next) => {
 
     // Update status berkas utama laporan -> 'resolved'
     await db.query(
-      `UPDATE room_maintenance_requests
+      `UPDATE equipment_maintenance_requests
        SET status = 'resolved', resolved_at = NOW(), updated_at = NOW()
        WHERE id = ?`,
       [id]
@@ -328,9 +322,9 @@ const close = async (req, res, next) => {
     // Kirim entri log final penutupan laporan (status 5 = Resolved/Closed)
     const logId = await nextLogId();
     await db.query(
-      `INSERT INTO room_maintenance_request_log
-          (id, room_maintenance_request_id, log, logged_by, logged_at, status, created_at, updated_at)
-       VALUES (?, ?, 'Permohonan disetujui dan ditutup oleh PJ Ruangan', ?, NOW(), 5, NOW(), NOW())`,
+      `INSERT INTO equipment_maintenance_request_log
+          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
+       VALUES (?, ?, 'Permohonan ditutup', ?, NOW(), 'Disetujui dan ditutup oleh Penanggung Jawab', 5, NOW(), NOW())`,
       [logId, id, pjEmployeeId]
     );
 
@@ -357,8 +351,8 @@ const revisi = async (req, res, next) => {
 
   try {
     const [latestLogs] = await db.query(
-      `SELECT status FROM room_maintenance_request_log
-       WHERE room_maintenance_request_id = ?
+      `SELECT status FROM equipment_maintenance_request_log
+       WHERE equipment_maintenance_request_id = ?
        ORDER BY created_at DESC, id DESC LIMIT 1`,
       [id]
     );
@@ -372,22 +366,21 @@ const revisi = async (req, res, next) => {
     }
 
     const [[laporan]] = await db.query(
-      `SELECT rmr.id FROM room_maintenance_requests rmr
-       JOIN rooms r ON rmr.room_id = r.id
-       WHERE rmr.id = ? AND r.responsible_employee_id = ?`,
-      [id, pjEmployeeId]
+      `SELECT emr.id FROM equipment_maintenance_requests emr
+       WHERE emr.id = ?`,
+      [id]
     );
     if (!laporan) {
-      req.session.flash = { type: 'error', message: 'Permohonan tidak ditemukan atau bukan wewenang Anda.' };
+      req.session.flash = { type: 'error', message: 'Permohonan tidak ditemukan.' };
       return res.redirect('/maintenance');
     }
 
     // Menyisipkan log baru dengan status 4 (Revision Requested) tanpa mengubah status global 'in_progress' pada tabel utama
     const logId = await nextLogId();
     await db.query(
-      `INSERT INTO room_maintenance_request_log
-          (id, room_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
-       VALUES (?, ?, 'Revisi perbaikan diminta oleh PJ Ruangan', ?, NOW(), ?, 4, NOW(), NOW())`,
+      `INSERT INTO equipment_maintenance_request_log
+          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
+       VALUES (?, ?, 'Revisi diminta', ?, NOW(), ?, 4, NOW(), NOW())`,
       [logId, id, pjEmployeeId, catatan.trim()]
     );
 

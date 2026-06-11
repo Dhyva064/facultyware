@@ -13,7 +13,7 @@ var indexRouter = require('./routes/index');
 var dashboardRouter = require('./routes/dashboard');
 //var laporanRouter = require('./routes/laporan');
 var pjLaporanRouter = require('./routes/pj/laporan');
-//var maintenanceRouter = require('./routes/pj/maintenance');
+var maintenanceRouter = require('./routes/pj/maintenance');
 // [TEST MODE] Route belum tersedia, dinonaktifkan sementara
 //var pengelolaRouter = require('./routes/pengelola');
 //var progresRouter = require('./routes/progres');
@@ -81,8 +81,9 @@ app.use((req, res, next) => {
 app.use('/', indexRouter);
 app.use('/dashboard', dashboardRouter);
 //app.use('/laporan', laporanRouter);
+app.use('/laporan', pjLaporanRouter);
 app.use('/pj/laporan', pjLaporanRouter);
-//app.use('/maintenance', maintenanceRouter);
+app.use('/maintenance', maintenanceRouter);
 // [TEST MODE] Route belum tersedia, dinonaktifkan sementara
 //app.use('/penugasan', pengelolaRouter);
 //app.use('/progres', progresRouter);

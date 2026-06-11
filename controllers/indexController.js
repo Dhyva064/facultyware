@@ -105,8 +105,34 @@ const login = async (req, res, next) => {
       req.session.username = user.name || "User SIMAINT";
       req.session.userEmail = user.email;
       req.session.userRoleId = user.role_id;
-      req.session.userRole = user.role_name;
-      req.session.roleLabel = getRoleLabel(user.role_name);
+
+      // Normalisasi agar redirect/halaman berdasarkan role konsisten
+      // (DB bisa saja menyimpan variasi string, mis. "Penanggung Jawab" vs "penanggung_jawab")
+      const normalizedRole = String(user.role_name || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_");
+
+      const roleMap = {
+        penanggung_jawab: "penanggung_jawab",
+        pengguna: "pengguna",
+        pengelola_aset: "pengelola_aset",
+      };
+
+      // fallback: coba deteksi berbasis kata kunci
+      const finalRole =
+        roleMap[normalizedRole] ||
+        (normalizedRole.includes("penanggung") && normalizedRole.includes("jawab")
+          ? "penanggung_jawab"
+          : normalizedRole.includes("pengguna")
+            ? "pengguna"
+            : normalizedRole.includes("pengelola")
+              ? "pengelola_aset"
+              : normalizedRole);
+
+      req.session.userRole = finalRole;
+      req.session.roleLabel = getRoleLabel(finalRole);
+      req.session.employeeId = user.id;
 
       req.session.save(function (err) {
         if (err) return next(err);

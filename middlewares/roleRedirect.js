@@ -5,13 +5,8 @@ function getRoleLabel(roleName) {
 }
 
 function getDashboardPartial(roleName) {
-  const partialMap = {
-    pengguna: "pengguna/index",
-    penanggung_jawab: "pj/index",
-    pengelola_aset: "pengelola/index",
-  };
-
-  return partialMap[roleName] || null;
+  /* Dashboard dirender langsung di home.ejs — tidak lagi memakai partial terpisah */
+  return null;
 }
 
 // Konfigurasi per-role: label dan deskripsi ringkas untuk header dashboard

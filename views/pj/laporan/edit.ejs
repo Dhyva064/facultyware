@@ -1,0 +1,141 @@
+<%- include('../../partials/header', {
+  title:       typeof title !== 'undefined' ? title : 'Edit Laporan',
+  currentPath: '/laporan',
+  userRole:    typeof userRole !== 'undefined' ? userRole : '',
+  userName:    typeof userName !== 'undefined' ? userName : '',
+  flash:       typeof flash !== 'undefined' ? flash : null
+}) %>
+
+<%
+  const _l    = typeof laporan !== 'undefined' ? laporan : {};
+  const _equipments = typeof equipments  !== 'undefined' ? equipments   : [];
+  const _errors = typeof errors !== 'undefined' && errors ? errors : [];
+  const _old  = typeof old !== 'undefined' ? old : {};
+
+  // Group equipments by asset_name
+  const _equipmentsByAsset = {};
+  _equipments.forEach(function(r) {
+    const assetName = r.asset_name || r.name;
+    if (!_equipmentsByAsset[assetName]) _equipmentsByAsset[assetName] = [];
+    _equipmentsByAsset[assetName].push(r);
+  });
+
+  function fieldError(field) {
+    const e = _errors.find(function(er) { return er.field === field; });
+    return e ? e.msg : null;
+  }
+  const selectedEquipment = _old.equipment_id ? String(_old.equipment_id) : String(_l.equipment_id || '');
+%>
+
+<!-- Breadcrumb -->
+<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);margin-bottom:20px;">
+  <a href="/laporan" style="color:var(--muted-foreground);text-decoration:none;">Daftar Laporan</a>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  <a href="/laporan/<%= _l.id %>" style="color:var(--muted-foreground);text-decoration:none;">
+    LPR-<%= String(_l.id).padStart(5, '0') %>
+  </a>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  <span style="color:var(--foreground);">Edit</span>
+</div>
+
+<div style="max-width:850px; width:100%; margin: 0 auto;">
+  <div style="margin-bottom:20px;">
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Edit Laporan</h1>
+    <p style="font-size:13px;color:var(--muted-foreground);">Perbarui informasi laporan kerusakan alat.</p>
+  </div>
+
+  <!-- Error summary -->
+  <% if (_errors.length > 0) { %>
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span style="font-size:13px;font-weight:600;color:#dc2626;">Terdapat <%= _errors.length %> kesalahan input:</span>
+    </div>
+    <ul style="margin:0;padding-left:20px;">
+      <% _errors.forEach(function(e) { %>
+      <li style="font-size:13px;color:#dc2626;"><%= e.msg %></li>
+      <% }); %>
+    </ul>
+  </div>
+  <% } %>
+
+  <div class="card" style="padding:28px;">
+    <form method="POST" action="/laporan/<%= _l.id %>">
+      <!-- Alat -->
+      <div style="margin-bottom:20px;">
+        <label for="equipment_id" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">
+          Nama Alat <span style="color:#dc2626;">*</span>
+        </label>
+        <select id="equipment_id" name="equipment_id"
+                style="width:100%;height:40px;font-size:14px;padding:0 12px;border-radius:8px;border:1px solid <%= fieldError('equipment_id') ? '#dc2626' : 'var(--border)' %>;background:var(--background);color:var(--foreground);outline:none;cursor:pointer;box-sizing:border-box;">
+          <option value="">-- Pilih Alat --</option>
+          <% Object.keys(_equipmentsByAsset).sort().forEach(function(assetName) { %>
+          <optgroup label="<%= assetName %>">
+            <% _equipmentsByAsset[assetName].forEach(function(r) { %>
+            <option value="<%= r.id %>" <%= String(r.id) === selectedEquipment ? 'selected' : '' %>>
+              <%= r.name || assetName %> (<%= r.code %>)
+            </option>
+            <% }); %>
+          </optgroup>
+          <% }); %>
+        </select>
+        <% if (fieldError('equipment_id')) { %>
+        <p style="font-size:12px;color:#dc2626;margin-top:4px;display:flex;align-items:center;gap:4px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <%= fieldError('equipment_id') %>
+        </p>
+        <% } %>
+      </div>
+
+      <!-- Deskripsi Kerusakan -->
+      <div style="margin-bottom:24px;">
+        <label for="issue_description" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">
+          Deskripsi Kerusakan <span style="color:#dc2626;">*</span>
+        </label>
+        <textarea id="issue_description" name="issue_description" rows="6"
+                  placeholder="Jelaskan secara detail kerusakan yang terjadi (minimal 20 karakter)..."
+                  style="width:100%;font-size:14px;resize:vertical;padding:10px 12px;border-radius:8px;border:1px solid <%= fieldError('issue_description') ? '#dc2626' : 'var(--border)' %>;background:var(--background);color:var(--foreground);font-family:inherit;outline:none;box-sizing:border-box;"><%= _old.issue_description ? _old.issue_description : (_l.issue_description || '') %></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+          <% if (fieldError('issue_description')) { %>
+          <p style="font-size:12px;color:#dc2626;display:flex;align-items:center;gap:4px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <%= fieldError('issue_description') %>
+          </p>
+          <% } else { %>
+          <span></span>
+          <% } %>
+          <span id="charCount" style="font-size:12px;color:var(--muted-foreground);">0 / 1000</span>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <a href="/laporan/<%= _l.id %>"
+           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:6px;font-size:14px;font-weight:500;border:1px solid var(--border);text-decoration:none;color:var(--foreground);background:var(--background);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Batal
+        </a>
+        <button type="submit" class="btn"
+                style="display:inline-flex;align-items:center;gap:6px;padding:8px 20px;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Simpan Perubahan
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const ta = document.getElementById('issue_description');
+    const counter = document.getElementById('charCount');
+    function updateCount() {
+      const len = ta.value.length;
+      counter.textContent = len + ' / 1000';
+      counter.style.color = len < 20 ? '#dc2626' : len > 900 ? '#d97706' : 'var(--muted-foreground)';
+    }
+    if (ta) { ta.addEventListener('input', updateCount); updateCount(); }
+  })();
+</script>
+
+<%- include('../../partials/footer') %>

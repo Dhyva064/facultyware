@@ -15,28 +15,13 @@
   <script>
     (() => {
       try {
-        const stored = localStorage.getItem('themeMode');
-        if (stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        }
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('themeMode', 'light');
+        localStorage.removeItem('themeVariant');
+        Array.from(document.documentElement.classList)
+          .filter((c) => c.startsWith('theme-'))
+          .forEach((c) => document.documentElement.classList.remove(c));
       } catch (_) {}
-      const apply = (dark) => {
-        document.documentElement.classList.toggle('dark', dark);
-        try { localStorage.setItem('themeMode', dark ? 'dark' : 'light'); } catch (_) {}
-      };
-      document.addEventListener('basecoat:theme', (event) => {
-        const mode = event.detail?.mode;
-        apply(mode === 'dark' ? true : mode === 'light' ? false : !document.documentElement.classList.contains('dark'));
-      });
-    })();
-  </script>
-
-  <script>
-    (function () {
-      try {
-        const storedTheme = localStorage.getItem('themeVariant');
-        if (storedTheme) document.documentElement.classList.add(`theme-${storedTheme}`);
-      } catch (e) {}
     })();
   </script>
 
@@ -49,11 +34,6 @@
     .role-pengguna         { background:#dbeafe; color:#1d4ed8; }
     .role-penanggung_jawab { background:#dcfce7; color:#15803d; }
     .role-pengelola_aset   { background:#fef9c3; color:#a16207; }
-
-    /* TAMBAHAN: Gaya Dark Mode untuk role-badge dari progress UI sebelumnya */
-    .dark .role-penanggung_jawab { background:rgba(34,197,94,0.15); color:#4ade80; }
-    .dark .role-pengguna         { background:rgba(59,130,246,0.15); color:#60a5fa; }
-    .dark .role-pengelola_aset   { background:rgba(234,179,8,0.15);  color:#facc15; }
 
     aside nav ul li a[aria-current="page"] { font-weight: 600; }
     .flash-bar {
@@ -106,8 +86,8 @@
       { href:'/laporan/buat', label:'Buat Laporan',      icon:'plus' },
     ],
     penanggung_jawab: [
-      { href:'/dashboard',   label:'Dashboard',               icon:'chart' },
-      { href:'/pj/laporan',  label:'Daftar Laporan',          icon:'list', badgeKey: 'newLaporan' },
+      { href:'/home',       label:'Dashboard',               icon:'chart' },
+      { href:'/laporan',    label:'Daftar Laporan',          icon:'list', badgeKey: 'newLaporan' },
       { href:'/maintenance', label:'Permohonan Maintenance',  icon:'tool', badgeKey: 'newMaintenance' },
     ],
     pengelola_aset: [
@@ -200,33 +180,6 @@
       </span>
 
       <div style="display:flex;align-items:center;gap:10px;">
-        
-        <select id="theme-select"
-                style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--background);color:var(--foreground);cursor:pointer;"
-                onchange="applyThemeVariant(this.value)"
-                title="Pilih tema warna">
-          <option value="">Default</option>
-          <option value="blue">Blue</option>
-          <option value="orange">Orange</option>
-          <option value="green">Green</option>
-          <option value="rose">Rose</option>
-          <option value="violet">Violet</option>
-          <option value="yellow">Yellow</option>
-        </select>
-
-        <button type="button"
-                onclick="document.dispatchEvent(new CustomEvent('basecoat:theme'))"
-                class="btn-sm-icon-ghost size-8"
-                title="Toggle tema gelap/terang"
-                aria-label="Toggle dark mode">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        </button>
-
         <div style="text-align:right;" class="hidden sm:block">
           <div style="font-size:13px;font-weight:600;line-height:1.3;"><%= _name %></div>
           <div style="font-size:11px;color:var(--muted-foreground);"><%= _roleLbl[_role] || _role %></div>
@@ -242,28 +195,6 @@
     <%- body %>
   </div>
 </main>
-
-<script>
-(function() {
-  try {
-    const saved = localStorage.getItem('themeVariant') || '';
-    const sel = document.getElementById('theme-select');
-    if (sel) sel.value = saved;
-  } catch(_){}
-})();
-
-function applyThemeVariant(variant) {
-  const html = document.documentElement;
-  const toRemove = Array.from(html.classList).filter(c => c.startsWith('theme-'));
-  toRemove.forEach(c => html.classList.remove(c));
-  if (variant) {
-    html.classList.add(`theme-${variant}`);
-    try { localStorage.setItem('themeVariant', variant); } catch(_){}
-  } else {
-    try { localStorage.removeItem('themeVariant'); } catch(_){}
-  }
-}
-</script>
 
 </body>
 </html>

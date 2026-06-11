@@ -2,54 +2,77 @@ const db = require('../lib/db');
 
 const PAGE_SIZE = 10;
 
+function pjLocals(req, extra = {}) {
+  return {
+    userRole:  req.session.userRole || 'penanggung_jawab',
+    userName:  req.session.username || 'User SIMAINT',
+    user:      req.session.username || 'User SIMAINT',
+    userEmail: req.session.userEmail || '',
+    roleLabel: 'Penanggung Jawab',
+    themeMode: 'light',
+    ...extra,
+  };
+}
+
+async function resolveEmployeeId(req) {
+  if (req.session.employeeId) return req.session.employeeId;
+  const userId = req.session.userId;
+  if (!userId) return null;
+  const [[emp]] = await db.query('SELECT id FROM employees WHERE id = ? LIMIT 1', [userId]);
+  return emp ? emp.id : null;
+}
+
 const STATUS_INFO = {
   reported:    { text: 'Dilaporkan', bg: '#fffbeb', color: '#a16207',  border: '#fde68a' },
   in_progress: { text: 'Diproses',   bg: '#eff6ff', color: '#1d4ed8',  border: '#bfdbfe' },
   resolved:    { text: 'Selesai',    bg: '#f0fdf4', color: '#15803d',  border: '#bbf7d0' },
 };
 
-/**
- * Relasi DB yang benar:
- *  - equipments.asset_id → assets.id         (nama alat di assets)
- *  - emr.equipment_id    → equipments.id
- *  - emr.employee_id     → employees.id       (PJ/pengelola yang di-assign)
- *  - emr.reported_by     → users.id
- *  - TIDAK ADA relasi langsung equipments → rooms
- *  - Filter milik PJ: WHERE emr.employee_id = <employeeId>
- */
-
-// Helper: dapatkan employee_id dari user_id
-async function getEmployeeId(userId) {
-  const [[emp]] = await db.query(
-    'SELECT id FROM employees WHERE id = ? LIMIT 1', [userId]
-  );
-  return emp ? emp.id : null;
-}
-
 // GET /dashboard — Dashboard PJ
 const getDashboard = async (req, res, next) => {
   try {
-    const userId        = req.session.userId;
-    const employeeId    = await getEmployeeId(userId);
     const currentFilter = req.query.filter === 'my' ? 'my' : 'all';
+    const pjEmployeeId  = await resolveEmployeeId(req);
 
     let baseWhere = '';
     let params    = [];
-    if (currentFilter === 'my' && employeeId) {
+    if (currentFilter === 'my' && pjEmployeeId) {
       baseWhere = 'WHERE emr.employee_id = ?';
-      params    = [employeeId];
+      params    = [pjEmployeeId];
     }
+    const joinEq = 'JOIN equipments eq ON emr.equipment_id = eq.id';
 
     const [[{ total: totalCount }]] = await db.query(
-      `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${baseWhere}`, params
+      `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${joinEq} ${baseWhere}`, params
     );
-    const [stats] = await db.query(
-      `SELECT emr.status, COUNT(*) as total FROM equipment_maintenance_requests emr ${baseWhere} GROUP BY emr.status`, params
+  
+    // MODIFIKASI: Mengubah query 'stats' sebelumnya menjadi 'rawStats'
+    const [rawStats] = await db.query(
+      `SELECT emr.status, COUNT(*) as total FROM equipment_maintenance_requests emr 
+       ${joinEq} 
+       ${baseWhere} GROUP BY emr.status`, params
     );
+
+    // MODIFIKASI: Memetakan rawStats ke dalam objek 'stats' agar langsung terbaca oleh home.ejs
+    const stats = {
+      menunggu: 0,
+      dalamPengerjaan: 0,
+      selesaiBulanIni: 0
+    };
+
+    rawStats.forEach(row => {
+      if (row.status === 'reported') stats.menunggu = row.total;
+      if (row.status === 'in_progress') stats.dalamPengerjaan = row.total;
+      if (row.status === 'resolved') stats.selesaiBulanIni = row.total;
+    });
+
+    // PENGEMBALIAN: Menambahkan kembali query maintenanceCount yang sempat hilang di snippet Anda
     const [[{ total: maintenanceCount }]] = await db.query(
-      `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${baseWhere}
-       ${baseWhere ? 'AND' : 'WHERE'} emr.status IN ('reported','in_progress')`, params
+      `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${joinEq}
+       ${baseWhere} AND emr.status IN ('reported','in_progress')`, params
     );
+    
+    // MODIFIKASI: Pastikan list recent laporan juga terkunci untuk aset milik PJ ini
     const [recentLaporan] = await db.query(
       `SELECT emr.id, a.name AS equipment_name, u.name AS reported_by_name,
               emr.issue_description, emr.status, emr.reported_at
@@ -70,9 +93,9 @@ const getDashboard = async (req, res, next) => {
       userEmail:     req.session?.userEmail || 'pj@ftiunand.ac.id',
       roleLabel:     'Penanggung Jawab',
       roleSummary:   'Meninjau pengajuan, memantau aset unit, dan menjalankan proses persetujuan yang menjadi kewenangan unit.',
-      dashboardView: 'pj/index',
+      dashboardView: 'home',
       totalCount,
-      stats,
+      stats,             // MODIFIKASI: Sekarang mengirimkan objek format baru (menunggu, dalamPengerjaan, selesaiBulanIni)
       maintenanceCount,
       recentLaporan,
       currentFilter,
@@ -84,19 +107,16 @@ const getDashboard = async (req, res, next) => {
   }
 };
 
-// GET /pj/laporan — Daftar laporan
+// GET /laporan — Daftar laporan
 const index = async (req, res, next) => {
   try {
-    const userId        = req.session.userId;
-    const employeeId    = await getEmployeeId(userId);
     const search        = req.query.search || '';
     const status        = req.query.status || '';
     const page          = Math.max(1, parseInt(req.query.page) || 1);
     const offset        = (page - 1) * PAGE_SIZE;
 
-    // PJ hanya lihat laporan yang di-assign kepadanya
-    const whereClauses  = ['emr.employee_id = ?'];
-    const params        = [employeeId];
+    const whereClauses  = [];
+    const params        = [];
 
     if (search) {
       whereClauses.push('a.name LIKE ?');
@@ -107,7 +127,7 @@ const index = async (req, res, next) => {
       params.push(status);
     }
 
-    const where = 'WHERE ' + whereClauses.join(' AND ');
+    const where = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : '';
 
     const [[{ total }]] = await db.query(
       `SELECT COUNT(*) as total
@@ -120,7 +140,7 @@ const index = async (req, res, next) => {
     );
 
     const [laporan] = await db.query(
-      `SELECT emr.id, a.name AS equipment_name,
+      `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
               u.name AS reported_by_name, emr.issue_description,
               emr.status, emr.reported_at
        FROM equipment_maintenance_requests emr
@@ -137,13 +157,9 @@ const index = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('home', {
-      pageTitle:     'Daftar Laporan Aset | SIMAINT',
-      user:          req.session?.username || 'User SIMAINT',
-      userEmail:     req.session?.userEmail || 'pj@ftiunand.ac.id',
-      roleLabel:     'Penanggung Jawab',
-      roleSummary:   'Daftar seluruh laporan kerusakan aset pada laboratorium wewenang Anda.',
-      dashboardView: 'pj/index',
+    res.render('pj/laporan/index', pjLocals(req, {
+      pageTitle:   'Daftar Laporan Aset | SIMAINT',
+      roleSummary: 'Daftar seluruh laporan kerusakan aset pada laboratorium wewenang Anda.',
       flash,
       laporan,
       STATUS_INFO,
@@ -152,34 +168,30 @@ const index = async (req, res, next) => {
       page,
       totalPages,
       total,
-    });
+    }));
   } catch (err) { next(err); }
 };
 
-// GET /pj/laporan/:id — Detail laporan
+// GET /laporan/:id — Detail laporan
 const show = async (req, res, next) => {
   try {
-    const userId     = req.session.userId;
-    const employeeId = await getEmployeeId(userId);
-    const { id }     = req.params;
+    const { id } = req.params;
 
     const [[laporan]] = await db.query(
       `SELECT emr.id, emr.issue_description, emr.status, emr.reported_at, emr.resolved_at,
-              a.name AS equipment_name,
+              a.name AS equipment_name, a.code AS equipment_code,
               u.name AS reported_by_name, u.email AS reported_by_email
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a      ON eq.asset_id       = a.id
        JOIN users u       ON emr.reported_by   = u.id
-       WHERE emr.id = ? AND emr.employee_id = ?`,
-      [id, employeeId]
+       WHERE emr.id = ?`,
+      [id]
     );
 
     if (!laporan) {
-      return res.status(404).render('error', {
-        message: 'Laporan tidak ditemukan',
-        error:   { status: 404, stack: 'Laporan alat tidak tersedia atau di luar wewenang Anda.' },
-      });
+      req.session.flash = { type: 'error', message: 'Laporan tidak ditemukan.' };
+      return res.redirect('/laporan');
     }
 
     const [logs] = await db.query(
@@ -194,27 +206,21 @@ const show = async (req, res, next) => {
     const flash = req.session.flash || null;
     delete req.session.flash;
 
-    res.render('home', {
-      pageTitle:     `Detail Laporan #${String(id).padStart(5, '0')} | SIMAINT`,
-      user:          req.session?.username || 'User SIMAINT',
-      userEmail:     req.session?.userEmail || 'pj@ftiunand.ac.id',
-      roleLabel:     'Penanggung Jawab',
-      roleSummary:   'Detail riwayat dan status penanganan kerusakan aset.',
-      dashboardView: 'pj/index',
+    res.render('pj/laporan/show', pjLocals(req, {
+      pageTitle:   `Detail Laporan #${String(id).padStart(5, '0')} | SIMAINT`,
+      roleSummary: 'Detail riwayat dan status penanganan kerusakan aset.',
       flash,
       laporan,
       logs,
       STATUS_INFO,
-    });
+    }));
   } catch (err) { next(err); }
 };
 
-// GET /pj/laporan/:id/edit — Form edit laporan
+// GET /laporan/:id/edit — Form edit laporan
 const edit = async (req, res, next) => {
   try {
-    const userId     = req.session.userId;
-    const employeeId = await getEmployeeId(userId);
-    const { id }     = req.params;
+    const { id } = req.params;
 
     const [[laporan]] = await db.query(
       `SELECT emr.id, emr.issue_description, emr.status, emr.equipment_id,
@@ -222,49 +228,41 @@ const edit = async (req, res, next) => {
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a      ON eq.asset_id       = a.id
-       WHERE emr.id = ? AND emr.employee_id = ?`,
-      [id, employeeId]
+       WHERE emr.id = ?`,
+      [id]
     );
 
     if (!laporan) {
-      return res.status(404).render('error', {
-        message: 'Laporan tidak ditemukan',
-        error:   { status: 404, stack: 'Laporan tidak ditemukan atau di luar kendali Anda.' },
-      });
+      req.session.flash = { type: 'error', message: 'Laporan tidak ditemukan.' };
+      return res.redirect('/laporan');
     }
 
     if (laporan.status !== 'reported') {
       req.session.flash = { type: 'error', message: 'Laporan yang telah diproses tidak dapat diubah.' };
-      return res.redirect(`/pj/laporan/${id}`);
+      return res.redirect(`/laporan/${id}`);
     }
 
-    // Daftar semua alat yang bisa dipilih
     const [equipments] = await db.query(
-      `SELECT eq.id, a.name
+      `SELECT eq.id, a.code AS asset_code, a.name AS asset_name
        FROM equipments eq
        JOIN assets a ON eq.asset_id = a.id
        ORDER BY a.name`
     );
 
-    res.render('home', {
-      pageTitle:     `Edit Laporan #${String(id).padStart(5, '0')} | SIMAINT`,
-      user:          req.session?.username || 'User SIMAINT',
-      userEmail:     req.session?.userEmail || 'pj@ftiunand.ac.id',
-      roleLabel:     'Penanggung Jawab',
-      dashboardView: 'pj/index',
-      flash:         null,
+    res.render('pj/laporan/edit', pjLocals(req, {
+      pageTitle: `Edit Laporan #${String(id).padStart(5, '0')} | SIMAINT`,
+      flash:     null,
       laporan,
       equipments,
-      errors:        null,
-      old:           { equipment_id: laporan.equipment_id, issue_description: laporan.issue_description },
-    });
+      errors:    null,
+      old:       { equipment_id: laporan.equipment_id, issue_description: laporan.issue_description },
+    }));
   } catch (err) { next(err); }
 };
 
-// POST /pj/laporan/:id — Update laporan
+// POST /laporan/:id — Update laporan
 const update = async (req, res, next) => {
-  const userId     = req.session.userId;
-  const { id }     = req.params;
+  const { id } = req.params;
   const { equipment_id, issue_description } = req.body;
 
   const errors = [];
@@ -275,39 +273,46 @@ const update = async (req, res, next) => {
 
   if (errors.length > 0) {
     try {
-      const employeeId = await getEmployeeId(userId);
       const [[laporan]] = await db.query(
         `SELECT emr.id, emr.issue_description, emr.status, a.name AS equipment_name
          FROM equipment_maintenance_requests emr
          JOIN equipments eq ON emr.equipment_id = eq.id
          JOIN assets a      ON eq.asset_id       = a.id
-         WHERE emr.id = ? AND emr.employee_id = ?`,
-        [id, employeeId]
+         WHERE emr.id = ?`,
+        [id]
       );
+
       const [equipments] = await db.query(
-        `SELECT eq.id, a.name FROM equipments eq JOIN assets a ON eq.asset_id = a.id ORDER BY a.name`
+        `SELECT eq.id, a.code AS asset_code, a.name AS asset_name
+         FROM equipments eq JOIN assets a ON eq.asset_id = a.id
+         ORDER BY a.name`
       );
-      return res.render('home', {
-        pageTitle:     'Edit Laporan | SIMAINT',
-        user:          req.session?.username || 'User SIMAINT',
-        roleLabel:     'Penanggung Jawab',
-        dashboardView: 'pj/index',
-        flash:         null,
+      
+      return res.render('pj/laporan/edit', pjLocals(req, {
+        pageTitle: 'Edit Laporan | SIMAINT',
+        flash:     null,
         laporan,
         equipments,
         errors,
         old: { equipment_id, issue_description },
-      });
+      }));
     } catch (e) { return next(e); }
   }
 
   try {
     const [[currentLaporan]] = await db.query(
-      'SELECT status FROM equipment_maintenance_requests WHERE id = ?', [id]
+      'SELECT status FROM equipment_maintenance_requests WHERE id = ?',
+      [id]
     );
-    if (currentLaporan && currentLaporan.status !== 'reported') {
+
+    if (!currentLaporan) {
+      req.session.flash = { type: 'error', message: 'Laporan tidak ditemukan.' };
+      return res.redirect('/laporan');
+    }
+    
+    if (currentLaporan.status !== 'reported') {
       req.session.flash = { type: 'error', message: 'Laporan yang telah berjalan tidak bisa diubah.' };
-      return res.redirect(`/pj/laporan/${id}`);
+      return res.redirect(`/laporan/${id}`);
     }
 
     await db.query(
@@ -318,35 +323,34 @@ const update = async (req, res, next) => {
     );
 
     req.session.flash = { type: 'success', message: 'Laporan aset berhasil diperbarui.' };
-    res.redirect(`/pj/laporan/${id}`);
+    res.redirect(`/laporan/${id}`);
   } catch (err) { next(err); }
 };
 
-// DELETE /pj/laporan/:id — Hapus laporan
+// DELETE /laporan/:id — Hapus laporan
 const destroy = async (req, res, next) => {
-  const userId = req.session.userId;
   const { id } = req.params;
+
   try {
-    const employeeId = await getEmployeeId(userId);
     const [[laporan]] = await db.query(
-      `SELECT emr.id, emr.status FROM equipment_maintenance_requests emr
-       WHERE emr.id = ? AND emr.employee_id = ?`,
-      [id, employeeId]
+      'SELECT id, status FROM equipment_maintenance_requests WHERE id = ?',
+      [id]
     );
+
     if (!laporan) {
-      req.session.flash = { type: 'error', message: 'Laporan tidak ditemukan atau melanggar hak akses.' };
-      return res.redirect('/pj/laporan');
+      req.session.flash = { type: 'error', message: 'Laporan tidak ditemukan.' };
+      return res.redirect('/laporan');
     }
     if (laporan.status !== 'reported') {
       req.session.flash = { type: 'error', message: 'Laporan sedang diproses, tidak boleh dihapus.' };
-      return res.redirect(`/pj/laporan/${id}`);
+      return res.redirect(`/laporan/${id}`);
     }
 
     await db.query('DELETE FROM equipment_maintenance_request_log WHERE equipment_maintenance_request_id = ?', [id]);
     await db.query('DELETE FROM equipment_maintenance_requests WHERE id = ?', [id]);
 
     req.session.flash = { type: 'success', message: 'Laporan kerusakan aset berhasil dihapus permanen.' };
-    res.redirect('/pj/laporan');
+    res.redirect('/laporan');
   } catch (err) { next(err); }
 };
 

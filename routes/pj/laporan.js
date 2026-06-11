@@ -20,6 +20,11 @@ const { isAuthenticated } = require('../../middlewares/auth');
 
 router.use(isAuthenticated);
 
+router.use((req, res, next) => {
+  if (req.session.userRole === 'penanggung_jawab') return next();
+  return res.redirect('/home');
+});
+
 // DAFTAR ROUTE CRUD LAPORAN PENANGGUNG JAWAB
 
 // GET  /PJ/LAPORAN — Daftar semua laporan kerusakan
