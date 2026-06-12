@@ -1,0 +1,86 @@
+<%- include('../../partials/header', {
+  title: typeof title !== 'undefined' ? title : 'Riwayat Progres',
+  currentPath: '/progres',
+  userRole: typeof userRole !== 'undefined' ? userRole : '',
+  userName: typeof userName !== 'undefined' ? userName : '',
+  flash: typeof flash !== 'undefined' ? flash : null
+}) %>
+
+<%
+  const _data = typeof penugasan !== 'undefined' ? penugasan : [];
+  const _total = typeof total !== 'undefined' ? total : 0;
+  const _search = typeof search !== 'undefined' ? search : '';
+  function fmtDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+  }
+  function trunc(s, n) {
+    if (!s) return '-';
+    return s.length > n ? s.substring(0, n) + '...' : s;
+  }
+%>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Riwayat Progres</h1>
+    <p style="font-size:13px;color:var(--muted-foreground);margin:0;">
+      Penugasan yang sudah selesai<% if (_total > 0) { %> - <strong><%= _total %></strong> riwayat<% } %>
+    </p>
+  </div>
+</div>
+
+<div class="card" style="padding:16px;margin-bottom:20px;">
+  <form method="GET" action="/progres" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div style="flex:1;min-width:220px;">
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted-foreground);margin-bottom:5px;">Cari Riwayat</label>
+      <input type="text" name="search" value="<%= _search %>" placeholder="Nama alat, kode, atau deskripsi..."
+             class="input" style="height:36px;font-size:13px;width:100%;box-sizing:border-box;"/>
+    </div>
+    <button type="submit" class="btn" style="height:36px;font-size:13px;padding:0 16px;">Cari</button>
+    <% if (_search) { %>
+      <a href="/progres" class="btn-outline" style="height:36px;font-size:13px;padding:0 14px;display:inline-flex;align-items:center;text-decoration:none;">Reset</a>
+    <% } %>
+  </form>
+</div>
+
+<div class="card" style="overflow:hidden;padding:0;">
+  <% if (_data.length === 0) { %>
+    <div style="padding:48px;text-align:center;color:var(--muted-foreground);">
+      <p style="font-size:14px;margin:0;">Belum ada riwayat penugasan selesai<% if (_search) { %> yang cocok<% } %>.</p>
+    </div>
+  <% } else { %>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);background:var(--muted);">
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Alat</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Pelapor</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Deskripsi</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:600;color:var(--muted-foreground);">Log</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Selesai</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:600;color:var(--muted-foreground);">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% _data.forEach(function(item) { %>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:12px 14px;white-space:nowrap;">
+                <div style="font-weight:600;"><%= item.equipment_name %></div>
+                <div style="font-size:12px;color:var(--muted-foreground);"><%= item.equipment_code || '-' %></div>
+              </td>
+              <td style="padding:12px 14px;white-space:nowrap;color:var(--muted-foreground);"><%= item.reported_by_name || '-' %></td>
+              <td style="padding:12px 14px;max-width:280px;"><span title="<%= item.issue_description %>"><%= trunc(item.issue_description, 60) %></span></td>
+              <td style="padding:12px 14px;text-align:center;"><%= item.log_count %></td>
+              <td style="padding:12px 14px;white-space:nowrap;color:var(--muted-foreground);"><%= fmtDate(item.resolved_at) %></td>
+              <td style="padding:12px 14px;text-align:center;">
+                <a href="/penugasan/<%= item.id %>" class="btn-outline" style="display:inline-flex;align-items:center;height:30px;padding:0 12px;font-size:12px;text-decoration:none;">Detail</a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../../partials/footer') %>

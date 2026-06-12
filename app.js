@@ -15,9 +15,8 @@ var dashboardRouter = require('./routes/dashboard');
 var penggunaRouter = require('./routes/pengguna');
 var pjLaporanRouter = require('./routes/pj/laporan');
 var maintenanceRouter = require('./routes/pj/maintenance');
-// [TEST MODE] Route belum tersedia, dinonaktifkan sementara
-//var pengelolaRouter = require('./routes/pengelola');
-//var progresRouter = require('./routes/progres');
+var pengelolaRouter = require('./routes/pengelola');
+var progresRouter = require('./routes/progress');
 //var apiRouter = require('./routes/api');
 
 const { notFoundHandler, errorHandler } = require('./middlewares/error');
@@ -81,13 +80,16 @@ app.use((req, res, next) => {
 // MODIFIKASI: Registrasi rute aplikasi SIMAINT
 app.use('/', indexRouter);
 app.use('/dashboard', dashboardRouter);
-app.use('/laporan', penggunaRouter);
-//app.use('/laporan', laporanRouter);
+app.use('/laporan', (req, res, next) => {
+  if (req.session && req.session.userRole === 'penanggung_jawab') {
+    return pjLaporanRouter(req, res, next);
+  }
+  return penggunaRouter(req, res, next);
+});
 app.use('/pj/laporan', pjLaporanRouter);
 app.use('/maintenance', maintenanceRouter);
-// [TEST MODE] Route belum tersedia, dinonaktifkan sementara
-//app.use('/penugasan', pengelolaRouter);
-//app.use('/progres', progresRouter);
+app.use('/penugasan', pengelolaRouter);
+app.use('/progres', progresRouter);
 //app.use('/api/v1', apiRouter);
 
 // catch 404 and forward to error handler

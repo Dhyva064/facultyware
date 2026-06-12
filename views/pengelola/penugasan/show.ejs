@@ -1,0 +1,147 @@
+<%- include('../../partials/header', {
+  title: typeof title !== 'undefined' ? title : 'Detail Penugasan',
+  currentPath: '/penugasan',
+  userRole: typeof userRole !== 'undefined' ? userRole : '',
+  userName: typeof userName !== 'undefined' ? userName : '',
+  flash: typeof flash !== 'undefined' ? flash : null
+}) %>
+
+<%
+  const _l = typeof laporan !== 'undefined' ? laporan : {};
+  const _logs = typeof logs !== 'undefined' ? logs : [];
+  const _si = typeof STATUS_INFO !== 'undefined' ? STATUS_INFO : {};
+  const si = _si[_l.status] || { text: _l.status, bg:'#f3f4f6', color:'#374151', border:'#d1d5db' };
+  const isResolved = _l.status === 'resolved';
+
+  function fmtDateTime(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  const logStatusLabel = { 1:'Permohonan Dibuat', 2:'Diterima', 3:'Progres Perbaikan', 4:'Revisi Diminta', 5:'Dinyatakan Selesai' };
+  const logStatusColor = {
+    1: { bg:'#eff6ff', color:'#1d4ed8' },
+    2: { bg:'#f0fdf4', color:'#15803d' },
+    3: { bg:'#faf5ff', color:'#7e22ce' },
+    4: { bg:'#fff7ed', color:'#c2410c' },
+    5: { bg:'#f0fdf4', color:'#15803d' },
+  };
+%>
+
+<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);margin-bottom:20px;">
+  <a href="/penugasan" style="color:var(--muted-foreground);text-decoration:none;">Penugasan Aktif</a>
+  <span>/</span>
+  <span style="color:var(--foreground);">MNT-<%= String(_l.id).padStart(5,'0') %></span>
+</div>
+
+<div style="max-width:900px;margin:0 auto;">
+  <div class="card" style="padding:24px;margin-bottom:20px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+      <div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:4px;">Nomor Penugasan</div>
+        <div style="font-size:20px;font-weight:700;">MNT-<%= String(_l.id).padStart(5,'0') %></div>
+      </div>
+      <span class="status-badge status-<%= _l.status %>" style="padding:5px 14px;font-size:13px;"><%= si.text %></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px;">
+      <div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:3px;">Nama Alat</div>
+        <div style="font-size:14px;font-weight:600;"><%= _l.equipment_name %></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:3px;">Kode Alat</div>
+        <div style="font-size:14px;font-weight:600;"><%= _l.equipment_code || '-' %></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:3px;">Serial Number</div>
+        <div style="font-size:14px;font-weight:600;"><%= _l.serial_number || '-' %></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:3px;">Pelapor</div>
+        <div style="font-size:14px;font-weight:600;"><%= _l.reported_by_name || '-' %></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:3px;">Tanggal Laporan</div>
+        <div style="font-size:14px;font-weight:600;"><%= fmtDateTime(_l.reported_at) %></div>
+      </div>
+      <% if (_l.resolved_at) { %>
+        <div>
+          <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:3px;">Tanggal Selesai</div>
+          <div style="font-size:14px;font-weight:600;color:#15803d;"><%= fmtDateTime(_l.resolved_at) %></div>
+        </div>
+      <% } %>
+    </div>
+
+    <div>
+      <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:6px;">Deskripsi Kerusakan</div>
+      <div style="font-size:14px;line-height:1.65;background:var(--muted);border-radius:8px;padding:14px 16px;white-space:pre-wrap;"><%= _l.issue_description %></div>
+    </div>
+  </div>
+
+  <% if (!isResolved) { %>
+    <div class="card" style="padding:24px;margin-bottom:20px;">
+      <h2 style="font-size:15px;font-weight:700;margin-bottom:14px;">Update Riwayat Perbaikan</h2>
+      <form method="POST" action="/penugasan/<%= _l.id %>/progress">
+        <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+          <div>
+            <label for="log" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Judul Progres</label>
+            <input id="log" name="log" type="text" maxlength="45" required
+                   placeholder="Contoh: Pemeriksaan awal"
+                   class="input" style="width:100%;box-sizing:border-box;height:38px;font-size:14px;"/>
+          </div>
+          <div>
+            <label for="description" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Catatan Perbaikan</label>
+            <textarea id="description" name="description" rows="4" required
+                      placeholder="Tuliskan progres, tindakan perbaikan, atau hasil pemeriksaan..."
+                      style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+          <button type="submit" class="btn" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;">
+            Simpan Riwayat
+          </button>
+        </div>
+      </form>
+    </div>
+  <% } %>
+
+  <div class="card" style="padding:24px;">
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:20px;">Riwayat Perbaikan <span style="font-size:12px;font-weight:400;color:var(--muted-foreground);">(<%= _logs.length %> entri)</span></h2>
+
+    <% if (_logs.length === 0) { %>
+      <p style="font-size:13.5px;color:var(--muted-foreground);text-align:center;padding:24px 0;">Belum ada riwayat perbaikan.</p>
+    <% } else { %>
+      <div style="position:relative;padding-left:28px;">
+        <div style="position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--border);border-radius:1px;"></div>
+        <% _logs.forEach(function(lg, i) {
+          const lsc = logStatusColor[lg.status] || { bg:'#f3f4f6', color:'#374151' };
+          const lsl = logStatusLabel[lg.status] || ('Status ' + lg.status);
+        %>
+          <div style="position:relative;margin-bottom:<%= i < _logs.length - 1 ? '24px' : '0' %>;">
+            <div style="position:absolute;left:-24px;top:4px;width:14px;height:14px;border-radius:50%;background:<%= lsc.color %>;border:2px solid var(--background);box-shadow:0 0 0 2px <%= lsc.color %>30;"></div>
+            <div style="background:var(--muted);border-radius:10px;padding:14px 16px;<%= lg.status === 4 ? 'border-left:3px solid #d97706;' : '' %>">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                <span style="display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:11.5px;font-weight:600;background:<%= lsc.bg %>;color:<%= lsc.color %>;"><%= lsl %></span>
+                <span style="font-size:12px;color:var(--muted-foreground);"><%= fmtDateTime(lg.logged_at || lg.created_at) %></span>
+                <% if (lg.logged_by_name) { %>
+                  <span style="font-size:12px;color:var(--muted-foreground);">oleh <strong style="color:var(--foreground);"><%= lg.logged_by_name %></strong></span>
+                <% } %>
+              </div>
+              <% if (lg.log) { %><p style="font-size:13.5px;font-weight:500;margin-bottom:6px;"><%= lg.log %></p><% } %>
+              <% if (lg.description) { %><p style="font-size:13.5px;color:var(--muted-foreground);line-height:1.6;margin:0;white-space:pre-wrap;"><%= lg.description %></p><% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <div style="margin-top:16px;">
+    <a href="/penugasan" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);text-decoration:none;">
+      Kembali ke Daftar Penugasan
+    </a>
+  </div>
+</div>
+
+<%- include('../../partials/footer') %>

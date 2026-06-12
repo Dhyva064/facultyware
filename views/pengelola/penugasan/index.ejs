@@ -1,0 +1,119 @@
+<%- include('../../partials/header', {
+  title: typeof title !== 'undefined' ? title : 'Penugasan Maintenance',
+  currentPath: '/penugasan',
+  userRole: typeof userRole !== 'undefined' ? userRole : '',
+  userName: typeof userName !== 'undefined' ? userName : '',
+  flash: typeof flash !== 'undefined' ? flash : null
+}) %>
+
+<%
+  const _data = typeof penugasan !== 'undefined' ? penugasan : [];
+  const _total = typeof total !== 'undefined' ? total : 0;
+  const _page = typeof page !== 'undefined' ? page : 1;
+  const _totalPages = typeof totalPages !== 'undefined' ? totalPages : 1;
+  const _search = typeof search !== 'undefined' ? search : '';
+
+  function fmtDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+  }
+  function trunc(s, n) {
+    if (!s) return '-';
+    return s.length > n ? s.substring(0, n) + '...' : s;
+  }
+  function buildQ(overrides) {
+    const q = Object.assign({ search: _search, page: _page }, overrides);
+    const p = [];
+    if (q.search) p.push('search=' + encodeURIComponent(q.search));
+    if (q.page > 1) p.push('page=' + q.page);
+    return '/penugasan' + (p.length ? '?' + p.join('&') : '');
+  }
+%>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Penugasan Maintenance</h1>
+    <p style="font-size:13px;color:var(--muted-foreground);margin:0;">
+      Daftar penugasan aktif Anda<% if (_total > 0) { %> - <strong><%= _total %></strong> penugasan<% } %>
+    </p>
+  </div>
+</div>
+
+<div class="card" style="padding:16px;margin-bottom:20px;">
+  <form method="GET" action="/penugasan" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div style="flex:1;min-width:220px;">
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--muted-foreground);margin-bottom:5px;">Cari Penugasan</label>
+      <input type="text" name="search" value="<%= _search %>" placeholder="Nama alat, kode, atau deskripsi..."
+             class="input" style="height:36px;font-size:13px;width:100%;box-sizing:border-box;"/>
+    </div>
+    <button type="submit" class="btn" style="height:36px;font-size:13px;padding:0 16px;">Cari</button>
+    <% if (_search) { %>
+      <a href="/penugasan" class="btn-outline" style="height:36px;font-size:13px;padding:0 14px;display:inline-flex;align-items:center;text-decoration:none;">Reset</a>
+    <% } %>
+  </form>
+</div>
+
+<div class="card" style="overflow:hidden;padding:0;">
+  <% if (_data.length === 0) { %>
+    <div style="padding:48px;text-align:center;color:var(--muted-foreground);">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+           style="margin:0 auto 12px;display:block;opacity:.4;">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+      <p style="font-size:14px;margin:0;">Tidak ada penugasan aktif<% if (_search) { %> yang cocok<% } %>.</p>
+    </div>
+  <% } else { %>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);background:var(--muted);">
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">No</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Alat</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Pelapor</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Deskripsi</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:600;color:var(--muted-foreground);">Log</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--muted-foreground);">Tanggal</th>
+            <th style="padding:10px 14px;text-align:center;font-weight:600;color:var(--muted-foreground);">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% _data.forEach(function(item, i) { %>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:12px 14px;color:var(--muted-foreground);"><%= (_page - 1) * 10 + i + 1 %></td>
+              <td style="padding:12px 14px;white-space:nowrap;">
+                <div style="font-weight:600;"><%= item.equipment_name %></div>
+                <div style="font-size:12px;color:var(--muted-foreground);"><%= item.equipment_code || '-' %></div>
+              </td>
+              <td style="padding:12px 14px;white-space:nowrap;color:var(--muted-foreground);"><%= item.reported_by_name || '-' %></td>
+              <td style="padding:12px 14px;max-width:260px;"><span title="<%= item.issue_description %>"><%= trunc(item.issue_description, 52) %></span></td>
+              <td style="padding:12px 14px;text-align:center;">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--muted);font-size:12px;font-weight:600;color:var(--muted-foreground);"><%= item.log_count %></span>
+              </td>
+              <td style="padding:12px 14px;white-space:nowrap;color:var(--muted-foreground);"><%= fmtDate(item.reported_at) %></td>
+              <td style="padding:12px 14px;text-align:center;">
+                <a href="/penugasan/<%= item.id %>" class="btn-outline"
+                   style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;font-size:12px;text-decoration:none;">
+                  Detail
+                </a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (_totalPages > 1) { %>
+      <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:var(--muted-foreground);">
+          Menampilkan <%= (_page - 1) * 10 + 1 %>-<%= Math.min(_page * 10, _total) %> dari <%= _total %>
+        </span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <% if (_page > 1) { %><a href="<%= buildQ({ page: _page - 1 }) %>" class="btn-outline" style="height:32px;padding:0 12px;font-size:12px;text-decoration:none;">Sebelumnya</a><% } %>
+          <% if (_page < _totalPages) { %><a href="<%= buildQ({ page: _page + 1 }) %>" class="btn-outline" style="height:32px;padding:0 12px;font-size:12px;text-decoration:none;">Berikutnya</a><% } %>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
+</div>
+
+<%- include('../../partials/footer') %>

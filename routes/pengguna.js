@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const penggunaController = require('../controllers/penggunaController');
+const pdfController = require('../controllers/pdfController');
 const { isAuthenticated } = require('../middlewares/auth');
 
 // Middleware: Pastikan user role adalah 'pengguna'
@@ -20,6 +21,9 @@ router.get('/buat', penggunaController.getCreateForm);
 
 // POST /laporan — Simpan laporan kerusakan aset
 router.post('/', penggunaController.postStore);
+
+// GET /laporan/:id/pdf — Unduh bukti laporan kerusakan aset
+router.get('/:id/pdf', pdfController.buktiLaporan);
 
 // GET /laporan/:id — Detail laporan kerusakan aset
 router.get('/:id', penggunaController.getDetail);

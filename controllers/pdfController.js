@@ -29,6 +29,23 @@ function fmtDateTimePukul(d) {
   return `${tgl}\nPukul ${jam}`;
 }
 
+async function getReportedByEmployeeId(userId) {
+  let reportedByEmployeeId = userId;
+  const [[userAsEmployee]] = await db.query(
+    'SELECT id FROM employees WHERE id = ?',
+    [userId]
+  );
+
+  if (!userAsEmployee) {
+    const [[defaultEmployee]] = await db.query(
+      'SELECT id FROM employees LIMIT 1'
+    );
+    reportedByEmployeeId = defaultEmployee?.id || 1;
+  }
+
+  return reportedByEmployeeId;
+}
+
 function initDoc() {
   const doc = new PDFDocument({ margin: 40, bufferPages: true, size: 'A4' });
   // Font fallback jika font tidak ditemukan
@@ -202,16 +219,23 @@ const buktiLaporan = async (req, res, next) => {
   try {
     const userId = req.session.userId;
     const { id } = req.params;
+    const reportedByEmployeeId = await getReportedByEmployeeId(userId);
 
     const [[laporan]] = await db.query(
       `SELECT emr.*, a.name AS equipment_name, a.code AS equipment_code,
-              u.name AS reported_by_name, u.email AS reported_by_email
+              COALESCE(e_reporter.name, ?) AS reported_by_name,
+              ? AS reported_by_email
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
-       JOIN users u ON emr.reported_by = u.id
+       LEFT JOIN employees e_reporter ON emr.reported_by = e_reporter.id
        WHERE emr.id = ? AND emr.reported_by = ?`,
-      [id, userId]
+      [
+        req.session.username || 'Pengguna',
+        req.session.userEmail || '-',
+        id,
+        reportedByEmployeeId
+      ]
     );
 
     if (!laporan) {
