@@ -14,7 +14,7 @@ const index = (req, res) => {
 // 2. GET Login Page (/login)
 const loginPage = (req, res) => {
   if (req.session.userId && req.session.userRole) {
-    return res.redirect("/home");
+    return res.redirect("/auth/role-redirect");
   }
 
   if (req.session.userId && !req.session.userRole) {
@@ -136,7 +136,7 @@ const login = async (req, res, next) => {
 
       req.session.save(function (err) {
         if (err) return next(err);
-        return res.redirect("/home");
+        return res.redirect("/auth/role-redirect");
       });
     });
   } catch (err) {

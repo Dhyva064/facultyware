@@ -33,9 +33,9 @@ function getRoleConfig(roleName) {
 const roleRedirect = (req, res) => {
   const role = req.session.userRole;
 
-  // Seluruh role diarahkan ke gerbang masuk utama (/home) SIMAINT 
+  // Halaman tujuan utama masing-masing role setelah login
   const destinations = {
-    pengguna:         '/home',
+    pengguna:         '/laporan',
     penanggung_jawab: '/home',
     pengelola_aset:   '/home',
   };

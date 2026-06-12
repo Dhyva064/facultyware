@@ -1,0 +1,163 @@
+<%- include('../../partials/header', {
+  title:       'Buat Laporan Kerusakan Aset',
+  currentPath: '/laporan',
+  userRole:    typeof userRole !== 'undefined' ? userRole : '',
+  userName:    typeof userName !== 'undefined' ? userName : '',
+  flash:       typeof flash !== 'undefined' ? flash : null
+}) %>
+
+<%
+  const _equipments = typeof equipments !== 'undefined' ? equipments : [];
+  const _errors     = typeof errors !== 'undefined' && errors ? errors : [];
+  const _old        = typeof old !== 'undefined' ? old : {};
+
+  function fieldError(field) {
+    const e = _errors.find(function(er) { return er.field === field; });
+    return e ? e.msg : null;
+  }
+%>
+
+<!-- Breadcrumb -->
+<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);margin-bottom:20px;">
+  <a href="/laporan" style="color:var(--muted-foreground);text-decoration:none;">Laporan Saya</a>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  <span style="color:var(--foreground);">Buat Laporan</span>
+</div>
+
+<div style="max-width:850px; width:100%; margin: 0 auto;">
+  <!-- Page Header -->
+  <div style="margin-bottom:28px;">
+    <h1 style="font-size:24px;font-weight:700;margin-bottom:8px;">Buat Laporan Kerusakan Aset</h1>
+    <p style="font-size:14px;color:var(--muted-foreground);">Laporkan kerusakan atau masalah pada aset/peralatan agar dapat ditangani dengan cepat oleh tim maintenance.</p>
+  </div>
+
+  <!-- Error summary -->
+  <% if (_errors.length > 0) { %>
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span style="font-size:13px;font-weight:600;color:#dc2626;">Harap perbaiki kesalahan berikut:</span>
+    </div>
+    <ul style="margin:0;padding-left:20px;">
+      <% _errors.forEach(function(e) { %><li style="font-size:13px;color:#dc2626;"><%= e.msg %></li><% }); %>
+    </ul>
+  </div>
+  <% } %>
+
+  <!-- Form -->
+  <form method="POST" action="/laporan" style="max-width:600px;">
+    <!-- Equipment Selection -->
+    <div style="margin-bottom:24px;">
+      <label for="equipment_id" style="display:block;font-size:14px;font-weight:500;margin-bottom:8px;color:var(--foreground);">
+        Pilih Peralatan
+        <span style="color:#dc2626;">*</span>
+      </label>
+      <select 
+        id="equipment_id" 
+        name="equipment_id" 
+        required
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--background);color:var(--foreground);<%= fieldError('equipment_id') ? 'border-color:#dc2626;' : '' %>"
+      >
+        <option value="" style="color:#999;">-- Pilih Peralatan --</option>
+        <% _equipments.forEach(function(eq) { %>
+          <option 
+            value="<%= eq.id %>" 
+            <%= _old.equipment_id == eq.id ? 'selected' : '' %>
+          >
+            <%= eq.asset_name %> (<%= eq.asset_code %><%= eq.serial_number ? ' - SN: ' + eq.serial_number : '' %>)
+          </option>
+        <% }); %>
+      </select>
+      <% if (fieldError('equipment_id')) { %>
+        <p style="font-size:13px;color:#dc2626;margin:6px 0 0 0;"><%= fieldError('equipment_id') %></p>
+      <% } %>
+    </div>
+
+    <!-- Issue Description -->
+    <div style="margin-bottom:24px;">
+      <label for="issue_description" style="display:block;font-size:14px;font-weight:500;margin-bottom:8px;color:var(--foreground);">
+        Deskripsi Masalah
+        <span style="color:#dc2626;">*</span>
+      </label>
+      <textarea 
+        id="issue_description" 
+        name="issue_description" 
+        required
+        placeholder="Jelaskan masalah atau kerusakan yang dialami oleh peralatan..."
+        rows="6"
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--background);color:var(--foreground);font-family:inherit;<%= fieldError('issue_description') ? 'border-color:#dc2626;' : '' %>"
+      ><%= _old.issue_description || '' %></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 0 0;">
+        <% if (fieldError('issue_description')) { %>
+          <p style="font-size:13px;color:#dc2626;margin:0;"><%= fieldError('issue_description') %></p>
+        <% } else { %>
+          <p style="font-size:13px;color:var(--muted-foreground);margin:0;">Maksimal 500 karakter</p>
+        <% } %>
+        <span style="font-size:13px;color:var(--muted-foreground);">
+          <span id="charCount">0</span>/500
+        </span>
+      </div>
+    </div>
+
+    <!-- Severity -->
+    <div style="margin-bottom:24px;">
+      <label for="severity" style="display:block;font-size:14px;font-weight:500;margin-bottom:8px;color:var(--foreground);">
+        Tingkat Prioritas
+      </label>
+      <div style="display:flex;gap:16px;">
+        <% ['low', 'medium', 'high'].forEach(function(sev) { 
+          const labels = { low: 'Rendah', medium: 'Sedang', high: 'Tinggi' };
+          const colors = { low: '#65a30d', medium: '#f59e0b', high: '#dc2626' };
+        %>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input 
+              type="radio" 
+              name="severity" 
+              value="<%= sev %>"
+              <%= _old.severity == sev || (!_old.severity && sev === 'medium') ? 'checked' : '' %>
+            />
+            <span style="font-size:14px;color:var(--foreground);">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:<%= colors[sev] %>;margin-right:4px;"></span>
+              <%= labels[sev] %>
+            </span>
+          </label>
+        <% }); %>
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div style="display:flex;gap:12px;margin-top:32px;">
+      <button 
+        type="submit" 
+        class="btn-primary"
+        style="flex:1;padding:12px 20px;background:#1d4ed8;color:white;border:none;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer;"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:8px;vertical-align:-2px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Kirim Laporan
+      </button>
+      <a 
+        href="/laporan" 
+        class="btn-outline"
+        style="flex:1;padding:12px 20px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-weight:500;text-decoration:none;text-align:center;color:var(--foreground);"
+      >
+        Batal
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- Character counter script -->
+<script>
+  const textarea = document.getElementById('issue_description');
+  const charCount = document.getElementById('charCount');
+  
+  if (textarea) {
+    textarea.addEventListener('input', function() {
+      charCount.textContent = this.value.length;
+    });
+    // Initialize on load
+    charCount.textContent = textarea.value.length;
+  }
+</script>
+
+<%- include('../../partials/footer') %>

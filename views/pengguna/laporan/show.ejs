@@ -1,0 +1,228 @@
+<%- include('../../partials/header', {
+  title:       'Detail Laporan Kerusakan Aset',
+  currentPath: '/laporan',
+  userRole:    typeof userRole !== 'undefined' ? userRole : '',
+  userName:    typeof userName !== 'undefined' ? userName : '',
+  flash:       typeof flash !== 'undefined' ? flash : null
+}) %>
+
+<%
+  const _laporan = typeof laporan !== 'undefined' ? laporan : null;
+  const _logs = typeof logs !== 'undefined' ? logs : [];
+  const STATUS_INFO_LOCAL = typeof STATUS_INFO !== 'undefined' ? STATUS_INFO : {};
+
+  if (!_laporan) {
+    %>
+    <div style="text-align:center;padding:40px 20px;">
+      <p style="font-size:16px;color:var(--foreground);">Laporan tidak ditemukan.</p>
+      <a href="/laporan" style="display:inline-block;margin-top:16px;padding:10px 16px;background:#1d4ed8;color:white;text-decoration:none;border-radius:6px;">Kembali ke Daftar</a>
+    </div>
+    <%- include('../../partials/footer') %>
+    <%
+    return;
+  }
+
+  function statusBadge(status) {
+    const info = STATUS_INFO_LOCAL[status] || { text: status, bg: '#f5f5f5', color: '#666', border: '#ddd' };
+    return `<span style="display:inline-block;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;background:${info.bg};color:${info.color};border:1px solid ${info.border};">${info.text}</span>`;
+  }
+
+  function severityBadge(severity) {
+    const colors = {
+      low: { bg: '#dcfce7', color: '#15803d', text: 'Rendah' },
+      medium: { bg: '#fef3c7', color: '#b45309', text: 'Sedang' },
+      high: { bg: '#fee2e2', color: '#dc2626', text: 'Tinggi' }
+    };
+    const info = colors[severity] || colors.medium;
+    return `<span style="display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:500;background:${info.bg};color:${info.color};">${info.text}</span>`;
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('id-ID', { 
+      day: '2-digit', 
+      month: 'long', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function formatDateOnly(d) {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('id-ID', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric'
+    });
+  }
+%>
+
+<!-- Breadcrumb -->
+<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);margin-bottom:20px;">
+  <a href="/laporan" style="color:var(--muted-foreground);text-decoration:none;">Laporan Saya</a>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  <span style="color:var(--foreground);">Detail Laporan #<%= _laporan.id %></span>
+</div>
+
+<!-- Page Header -->
+<div style="margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <h1 style="font-size:28px;font-weight:700;margin-bottom:4px;">Laporan #<%= _laporan.id %></h1>
+    <p style="font-size:14px;color:var(--muted-foreground);margin:0;"><%= formatDate(_laporan.reported_at) %></p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <%- statusBadge(_laporan.status) %>
+  </div>
+</div>
+
+<!-- Main Content Grid -->
+<div style="display:grid;grid-template-columns:1fr 300px;gap:24px;margin-bottom:28px;">
+  <!-- Left Column: Details -->
+  <div>
+    <!-- Equipment Info Card -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:24px;">
+      <h2 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--foreground);">Informasi Peralatan</h2>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <p style="font-size:12px;color:var(--muted-foreground);margin:0 0 4px 0;">Nama Peralatan</p>
+          <p style="font-size:14px;font-weight:500;color:var(--foreground);margin:0;"><%= _laporan.equipment_name %></p>
+        </div>
+        <div>
+          <p style="font-size:12px;color:var(--muted-foreground);margin:0 0 4px 0;">Kode Aset</p>
+          <p style="font-size:14px;font-weight:500;color:var(--foreground);margin:0;"><%= _laporan.equipment_code %></p>
+        </div>
+        <div>
+          <p style="font-size:12px;color:var(--muted-foreground);margin:0 0 4px 0;">Serial Number</p>
+          <p style="font-size:14px;font-weight:500;color:var(--foreground);margin:0;"><%= _laporan.serial_number || '—' %></p>
+        </div>
+        <div>
+          <p style="font-size:12px;color:var(--muted-foreground);margin:0 0 4px 0;">Prioritas</p>
+          <div style="margin:0;">
+            <%- severityBadge(_laporan.severity) %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Issue Description Card -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:24px;">
+      <h2 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--foreground);">Deskripsi Masalah</h2>
+      <p style="font-size:14px;color:var(--foreground);line-height:1.6;margin:0;white-space:pre-wrap;"><%= _laporan.issue_description %></p>
+    </div>
+
+    <!-- Timeline/Progress Card -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:24px;">
+      <h2 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--foreground);">Riwayat Progres</h2>
+      
+      <% if (_logs.length === 0) { %>
+        <p style="font-size:13px;color:var(--muted-foreground);text-align:center;padding:20px;margin:0;">
+          Belum ada update progres untuk laporan ini.
+        </p>
+      <% } else { %>
+        <div style="position:relative;">
+          <% _logs.forEach(function(log, idx) {
+            const statusMap = {
+              1: { text: 'Dilaporkan', icon: '📋', color: '#a16207' },
+              2: { text: 'Diproses', icon: '⚙️', color: '#1d4ed8' },
+              3: { text: 'Selesai', icon: '✓', color: '#15803d' }
+            };
+            const logStatus = statusMap[log.status] || { text: 'Unknown', icon: '?', color: '#666' };
+          %>
+            <div style="display:flex;gap:16px;margin-bottom:<%= idx === _logs.length - 1 ? '0' : '20px' %>;">
+              <div style="display:flex;flex-direction:column;align-items:center;">
+                <div style="width:40px;height:40px;border-radius:50%;background:<%= logStatus.color %>;color:white;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
+                  <%= logStatus.icon %>
+                </div>
+                <% if (idx !== _logs.length - 1) { %>
+                  <div style="width:2px;height:40px;background:var(--border);margin:8px 0;"></div>
+                <% } %>
+              </div>
+              <div style="flex:1;padding-top:4px;">
+                <div style="font-weight:600;color:var(--foreground);"><%= logStatus.text %></div>
+                <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:6px;">
+                  <%= formatDate(log.created_at) %>
+                </div>
+                <% if (log.notes) { %>
+                  <div style="font-size:13px;color:var(--foreground);background:var(--muted-background);padding:10px;border-radius:4px;margin-top:8px;border-left:3px solid <%= logStatus.color %>;">
+                    <%= log.notes %>
+                  </div>
+                <% } %>
+                <% if (log.updated_by) { %>
+                  <div style="font-size:12px;color:var(--muted-foreground);margin-top:8px;">
+                    Oleh: <strong><%= log.updated_by %></strong>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Right Column: Sidebar -->
+  <div>
+    <!-- Status Card -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;">
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-foreground);margin:0 0 12px 0;text-transform:uppercase;">Status Saat Ini</h3>
+      <div style="margin-bottom:16px;">
+        <%- statusBadge(_laporan.status) %>
+      </div>
+      
+      <% 
+        const statusMessages = {
+          reported: 'Laporan Anda telah diterima. Tim maintenance akan segera memproses.',
+          in_progress: 'Laporan Anda sedang diproses oleh tim maintenance.',
+          resolved: 'Laporan Anda telah selesai diproses.'
+        };
+      %>
+      <p style="font-size:12px;color:var(--muted-foreground);line-height:1.5;margin:0;">
+        <%= statusMessages[_laporan.status] || 'Status sedang diperbarui.' %>
+      </p>
+    </div>
+
+    <!-- Reporter Info Card -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;">
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-foreground);margin:0 0 12px 0;text-transform:uppercase;">Pelapor</h3>
+      <p style="font-size:14px;font-weight:500;color:var(--foreground);margin:0;"><%= _laporan.reported_by_name %></p>
+      <p style="font-size:12px;color:var(--muted-foreground);margin:6px 0 0 0;"><%= formatDateOnly(_laporan.reported_at) %></p>
+    </div>
+
+    <!-- Pengelola Info Card (if assigned) -->
+    <% if (_laporan.pengelola_name) { %>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;">
+        <h3 style="font-size:13px;font-weight:600;color:var(--muted-foreground);margin:0 0 12px 0;text-transform:uppercase;">Pengelola</h3>
+        <p style="font-size:14px;font-weight:500;color:var(--foreground);margin:0;"><%= _laporan.pengelola_name %></p>
+        <p style="font-size:12px;color:var(--muted-foreground);margin:6px 0 0 0;">Tim Maintenance</p>
+      </div>
+    <% } %>
+
+    <!-- Priority Card -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;">
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-foreground);margin:0 0 12px 0;text-transform:uppercase;">Prioritas</h3>
+      <div>
+        <%- severityBadge(_laporan.severity) %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Action Buttons -->
+<div style="display:flex;gap:12px;margin-bottom:28px;">
+  <a 
+    href="/laporan" 
+    style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);border-radius:6px;text-decoration:none;font-size:14px;color:var(--foreground);cursor:pointer;"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Kembali ke Daftar
+  </a>
+  <% if (_laporan.status !== 'resolved') { %>
+    <div style="margin-left:auto;font-size:12px;color:var(--muted-foreground);padding:10px 16px;">
+      Status akan diperbarui oleh tim maintenance
+    </div>
+  <% } %>
+</div>
+
+<%- include('../../partials/footer') %>

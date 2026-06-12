@@ -12,6 +12,7 @@ var indexRouter = require('./routes/index');
 // MODIFIKASI: Menambahkan rute spesifik SIMAINT yang diperlukan
 var dashboardRouter = require('./routes/dashboard');
 //var laporanRouter = require('./routes/laporan');
+var penggunaRouter = require('./routes/pengguna');
 var pjLaporanRouter = require('./routes/pj/laporan');
 var maintenanceRouter = require('./routes/pj/maintenance');
 // [TEST MODE] Route belum tersedia, dinonaktifkan sementara
@@ -80,8 +81,8 @@ app.use((req, res, next) => {
 // MODIFIKASI: Registrasi rute aplikasi SIMAINT
 app.use('/', indexRouter);
 app.use('/dashboard', dashboardRouter);
+app.use('/laporan', penggunaRouter);
 //app.use('/laporan', laporanRouter);
-app.use('/laporan', pjLaporanRouter);
 app.use('/pj/laporan', pjLaporanRouter);
 app.use('/maintenance', maintenanceRouter);
 // [TEST MODE] Route belum tersedia, dinonaktifkan sementara
