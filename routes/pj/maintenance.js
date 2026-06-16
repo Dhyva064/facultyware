@@ -34,6 +34,12 @@ router.get('/',
   maintenanceCtrl.index
 );
 
+// GET  /PJ/MAINTENANCE/REKAP-PDF — Download Rekap Bulanan PDF
+router.get('/rekap-pdf',
+  checkPermission('maintenance.view'),
+  maintenanceCtrl.downloadRekapBulanan
+);
+
 // GET  /PJ/MAINTENANCE/BUAT — Membuka form pengajuan perbaikan mandiri oleh PJ 
 router.get('/buat',
   checkPermission('maintenance.create'),

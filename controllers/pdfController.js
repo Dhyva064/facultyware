@@ -81,7 +81,10 @@ const LOG_STATUS_LABEL = {
 // ── PDF Builder Helpers ────────────────────────────────────────────────────────
 
 function drawHeader(doc, subtitle) {
-  const logoPath = path.join(__dirname, '../public/assets/images/logo-unand.png');
+  let logoPath = path.join(__dirname, '../public/assets/images/logo-unand.png');
+  if (!fs.existsSync(logoPath)) {
+    logoPath = path.join(__dirname, '../public/assets/images/logo_unand.png');
+  }
   let hasLogo = fs.existsSync(logoPath);
   
   if (hasLogo) {
@@ -209,6 +212,15 @@ function checkPageBreak(doc, neededSpace = 60) {
     return true;
   }
   return false;
+}
+
+function collectPdfBuffer(doc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -343,148 +355,175 @@ const rekapBulanan = async (req, res, next) => {
       });
     }
 
-    const userId = req.session.userId;
-    const [[emp]] = await db.query('SELECT id FROM employees WHERE id = ? LIMIT 1', [userId]);
-    const employeeId = emp ? emp.id : null;
+    const [stats] = await db.query(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'reported' THEN 1 ELSE 0 END) as reported,
+        SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+        SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved
+      FROM equipment_maintenance_requests
+      WHERE DATE_FORMAT(reported_at, '%Y-%m') = ?
+    `, [bulan]);
 
-    if (!employeeId) {
-        return res.status(403).render('error', { message: 'Akses Ditolak', error: { status: 403, stack: 'Bukan Penanggung Jawab' } });
-    }
-
-    const [laporan] = await db.query(
-      `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
-              u.name AS reported_by, emr.issue_description,
-              emr.status, emr.reported_at, emr.resolved_at
-       FROM equipment_maintenance_requests emr
-       JOIN equipments eq ON emr.equipment_id = eq.id
-       JOIN assets a ON eq.asset_id = a.id
-       JOIN users u ON emr.reported_by = u.id
-       WHERE DATE_FORMAT(emr.reported_at, '%Y-%m') = ?
-         AND emr.employee_id = ?
-       ORDER BY emr.reported_at ASC`,
-      [bulan, employeeId]
-    );
-
-    const total     = laporan.length;
-    const selesai   = laporan.filter(l => l.status === 'resolved').length;
-    const proses    = laporan.filter(l => l.status === 'in_progress').length;
-    const dilaporkan = laporan.filter(l => l.status === 'reported').length;
-
-    const [tahun, bln] = bulan.split('-');
-    const namaBulan = new Date(`${tahun}-${bln}-01`)
-      .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    const [maintenance] = await db.query(`
+      SELECT emr.reported_at, a.code AS equipment_code, a.name AS equipment_name, eq.brand,
+             u.name AS pelapor_name, emr.status, emr.issue_description
+      FROM equipment_maintenance_requests emr
+      JOIN equipments eq ON emr.equipment_id = eq.id
+      JOIN assets a ON eq.asset_id = a.id
+      JOIN users u ON emr.reported_by = u.id
+      WHERE DATE_FORMAT(emr.reported_at, '%Y-%m') = ?
+      ORDER BY emr.reported_at DESC
+    `, [bulan]);
 
     const doc = initDoc();
+    const pdfReady = collectPdfBuffer(doc);
     const filename = `rekap-laporan-alat-${bulan}.pdf`;
+    const [tahun, bln] = bulan.split('-');
+    const periode = new Date(Number(tahun), Number(bln) - 1, 1)
+      .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    const statObj = stats[0] || { total:0, reported:0, in_progress:0, resolved:0 };
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    doc.pipe(res);
+    const statusText = {
+      reported: 'Dilaporkan',
+      in_progress: 'Dalam Proses',
+      resolved: 'Selesai',
+    };
 
-    drawHeader(doc, `Rekap Laporan Maintenance Alat\nBULAN ${namaBulan}`);
-
-    doc.fontSize(12).font('Cambria-Bold').text('Ringkasan Statistik', 40);
-    doc.moveTo(40, doc.y + 1).lineTo(555, doc.y + 1).lineWidth(0.5).stroke('#CCCCCC');
-    doc.moveDown(0.3);
-
-    const boxW = 122, boxH = 52, boxGap = 9;
-    const boxY = doc.y;
-    const stats = [
-      { label: 'Total Laporan', val: total,      color: '#2563EB' },
-      { label: 'Dilaporkan',    val: dilaporkan,  color: '#D97706' },
-      { label: 'Dalam Proses',  val: proses,      color: '#7C3AED' },
-      { label: 'Selesai',       val: selesai,     color: '#15803D' },
+    const tableX = 40;
+    const tableW = 515;
+    const pageBottom = doc.page.height - 60;
+    const columns = [
+      { label: 'Tanggal', w: 66 },
+      { label: 'Kode Aset', w: 74 },
+      { label: 'Nama Aset', w: 150 },
+      { label: 'Merek', w: 65 },
+      { label: 'Pelapor', w: 88 },
+      { label: 'Status', w: 72 },
     ];
-    stats.forEach((s, i) => {
-      const bx = 40 + i * (boxW + boxGap);
-      doc.rect(bx, boxY, boxW, boxH).fill('#F8FAFF').stroke('#DDDDDD');
-      doc.fontSize(22).font('Cambria-Bold').fillColor(s.color)
-         .text(String(s.val), bx, boxY + 6, { width: boxW, align: 'center' });
-      doc.fontSize(9).font('Cambria').fillColor('#555555')
-         .text(s.label, bx, boxY + 32, { width: boxW, align: 'center' });
-    });
-    doc.fillColor('#000000');
-    doc.y = boxY + boxH + 20;
-    doc.moveDown(0.3);
 
-    doc.fontSize(12).font('Cambria-Bold').text('Daftar Laporan', 40);
-    doc.moveTo(40, doc.y + 1).lineTo(555, doc.y + 1).lineWidth(0.5).stroke('#CCCCCC');
-    doc.moveDown(0.3);
+    const ensureSpace = (height) => {
+      if (doc.y + height <= pageBottom) return false;
+      doc.addPage();
+      doc.y = 50;
+      return true;
+    };
 
-    if (laporan.length === 0) {
-      doc.fontSize(11).font('Cambria').fillColor('#888888')
-         .text('Tidak ada laporan pada periode ini.');
+    const drawStatsCard = (x, y, w, title, value) => {
+      doc.rect(x, y, w, 54).fillAndStroke('#F8FAFC', '#CBD5E1');
+      doc.font('Cambria-Bold').fontSize(8.5).fillColor('#475569')
+        .text(title, x + 8, y + 9, { width: w - 16, align: 'center' });
+      doc.font('Cambria-Bold').fontSize(20).fillColor('#111827')
+        .text(String(value || 0), x + 8, y + 27, { width: w - 16, align: 'center' });
       doc.fillColor('#000000');
-    } else {
-      const cols = [
-        { label: 'No',                 w: 30,  align: 'center' },
-        { label: 'Tanggal Pelaporan',  w: 100 },
-        { label: 'Nama Pelapor',       w: 105 },
-        { label: 'Nama Alat',          w: 105 },
-        { label: 'Kode Alat',          w: 85  },
-        { label: 'Status',             w: 90  },
-      ];
-      checkPageBreak(doc, 40);
-      let tY = drawTableHeader(doc, cols, doc.y);
-      
-      laporan.forEach((l, i) => {
-        const txtTgl     = fmtDate(l.reported_at);
-        const txtPelapor = l.reported_by || '-';
-        const txtAlat    = l.equipment_name || '-';
-        const txtKode    = l.equipment_code || '-';
-        const txtStatus  = STATUS_LABEL[l.status] || l.status || '-';
-        
-        const hTgl     = doc.heightOfString(txtTgl,     { width: 100 - 8, fontSize: 10 });
-        const hPelapor = doc.heightOfString(txtPelapor, { width: 105 - 8, fontSize: 10 });
-        const hAlat    = doc.heightOfString(txtAlat,    { width: 105 - 8, fontSize: 10 });
-        const hKode    = doc.heightOfString(txtKode,    { width: 85 - 8,  fontSize: 10 });
-        const hStatus  = doc.heightOfString(txtStatus,  { width: 90 - 8,  fontSize: 10 });
-        
-        const h1 = Math.max(hTgl, hPelapor, hAlat, hKode, hStatus) + 10;
-        
-        const txtDesc = `Deskripsi: ${l.issue_description || '-'}`;
-        const h2 = doc.heightOfString(txtDesc, { width: 485 - 8, fontSize: 10 }) + 10;
-        const hRecord = h1 + h2;
-        
-        const didBreak = checkPageBreak(doc, hRecord);
-        if (didBreak) {
-          tY = drawTableHeader(doc, cols, doc.y);
-        }
-        
-        if (i % 2 === 0) {
-          doc.rect(40, tY, 515, hRecord).fill('#F9FAFB');
-        }
-        
-        doc.rect(40, tY, 515, hRecord).stroke('#000000');
-        doc.moveTo(70, tY).lineTo(70, tY + hRecord).stroke('#000000');
-        doc.moveTo(70, tY + h1).lineTo(555, tY + h1).stroke('#000000');
-        
-        let x = 70;
-        const row1Cols = [100, 105, 105, 85, 90];
-        row1Cols.slice(0, 4).forEach(w => {
-          x += w;
-          doc.moveTo(x, tY).lineTo(x, tY + h1).stroke('#000000');
-        });
-        
-        doc.fontSize(10).font('Cambria-Bold').fillColor('#000000')
-           .text(String(i + 1), 40, tY + (hRecord - 10) / 2, { width: 30, align: 'center' });
-           
-        doc.fontSize(10).font('Cambria');
-        doc.text(txtTgl,     74,  tY + (h1 - hTgl) / 2,     { width: 100 - 8 });
-        doc.text(txtPelapor, 174, tY + (h1 - hPelapor) / 2,  { width: 105 - 8 });
-        doc.text(txtAlat,    279, tY + (h1 - hAlat) / 2,    { width: 105 - 8 });
-        doc.text(txtKode,    384, tY + (h1 - hKode) / 2,    { width: 85 - 8 });
-        doc.text(txtStatus,  469, tY + (h1 - hStatus) / 2,  { width: 90 - 8 });
-        
-        doc.text(txtDesc, 74, tY + h1 + 5, { width: 485 - 8 });
-        
-        tY += hRecord;
-        doc.y = tY;
+    };
+
+    const drawReportTableHeader = () => {
+      const y = doc.y;
+      doc.rect(tableX, y, tableW, 24).fillAndStroke('#E5E7EB', '#94A3B8');
+      let x = tableX;
+      columns.forEach(col => {
+        doc.rect(x, y, col.w, 24).stroke('#94A3B8');
+        doc.font('Cambria-Bold').fontSize(9).fillColor('#111827')
+          .text(col.label, x + 6, y + 7, { width: col.w - 12 });
+        x += col.w;
       });
+      doc.fillColor('#000000');
+      doc.y = y + 24;
+    };
+
+    const drawReportRow = (row, index) => {
+      const values = [
+        fmtDate(row.reported_at),
+        row.equipment_code || '-',
+        row.equipment_name || '-',
+        row.brand || '-',
+        row.pelapor_name || '-',
+        statusText[row.status] || STATUS_LABEL[row.status] || row.status || '-',
+      ];
+
+      doc.font('Cambria').fontSize(9);
+      const mainRowH = Math.max(
+        28,
+        ...values.map((value, i) => doc.heightOfString(String(value), { width: columns[i].w - 12 }) + 14)
+      );
+
+      const descLabelH = 12;
+      const descH = doc.heightOfString(row.issue_description || '-', { width: tableW - 24, fontSize: 9 }) + 10;
+      const descBoxH = descLabelH + descH + 10;
+      const blockH = mainRowH + descBoxH + 12;
+
+      if (ensureSpace(blockH + 24)) drawReportTableHeader();
+
+      const y = doc.y;
+      if (index % 2 === 0) {
+        doc.rect(tableX, y, tableW, mainRowH).fill('#F9FAFB');
+      }
+      doc.rect(tableX, y, tableW, mainRowH).stroke('#CBD5E1');
+
+      let x = tableX;
+      values.forEach((value, i) => {
+        doc.rect(x, y, columns[i].w, mainRowH).stroke('#CBD5E1');
+        doc.font('Cambria').fontSize(9).fillColor('#111827')
+          .text(String(value), x + 6, y + 8, { width: columns[i].w - 12 });
+        x += columns[i].w;
+      });
+
+      doc.y = y + mainRowH + 8;
+      const descY = doc.y;
+      doc.rect(tableX, descY, tableW, descBoxH).fillAndStroke('#FFFFFF', '#E5E7EB');
+      doc.font('Cambria-Bold').fontSize(9).fillColor('#334155')
+        .text('Deskripsi Kerusakan:', tableX + 10, descY + 8, { width: tableW - 20 });
+      doc.font('Cambria').fontSize(9).fillColor('#111827')
+        .text(row.issue_description || '-', tableX + 10, descY + 24, { width: tableW - 20 });
+
+      doc.y = descY + descBoxH + 8;
+      doc.moveTo(tableX, doc.y).lineTo(tableX + tableW, doc.y).lineWidth(0.6).stroke('#CBD5E1');
+      doc.y += 10;
+      doc.fillColor('#000000');
+    };
+
+    drawHeader(doc, 'Rekap Laporan Maintenance Peralatan Bulanan');
+    doc.font('Cambria').fontSize(10).fillColor('#374151')
+      .text(`Periode Laporan: ${periode}`, 40, doc.y, { width: 515, align: 'center' });
+    doc.fillColor('#000000');
+    doc.moveDown(1.2);
+
+    doc.font('Cambria-Bold').fontSize(12).text('Ringkasan Statistik', tableX, doc.y);
+    doc.moveDown(0.5);
+
+    const cardGap = 10;
+    const cardW = (tableW - (cardGap * 3)) / 4;
+    const cardY = doc.y;
+    drawStatsCard(tableX, cardY, cardW, 'Total Laporan', statObj.total);
+    drawStatsCard(tableX + (cardW + cardGap), cardY, cardW, 'Dilaporkan', statObj.reported);
+    drawStatsCard(tableX + (cardW + cardGap) * 2, cardY, cardW, 'Dalam Proses', statObj.in_progress);
+    drawStatsCard(tableX + (cardW + cardGap) * 3, cardY, cardW, 'Selesai', statObj.resolved);
+    doc.y = cardY + 72;
+
+    doc.font('Cambria-Bold').fontSize(12).text('Daftar Laporan', tableX, doc.y);
+    doc.moveDown(0.5);
+
+    if (maintenance.length === 0) {
+      doc.rect(tableX, doc.y, tableW, 42).fillAndStroke('#F8FAFC', '#CBD5E1');
+      doc.font('Cambria').fontSize(10).fillColor('#64748B')
+        .text('Tidak ada laporan pada periode ini.', tableX, doc.y + 14, { width: tableW, align: 'center' });
+      doc.fillColor('#000000');
+      doc.y += 52;
+    } else {
+      drawReportTableHeader();
+      maintenance.forEach((row, index) => drawReportRow(row, index));
     }
 
     addPageNumbers(doc);
     doc.end();
+    const pdfBuffer = await pdfReady;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+
   } catch (err) { next(err); }
 };
 
