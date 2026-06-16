@@ -1,3 +1,4 @@
+const fs = require('fs');
 const db = require('../lib/db');
 
 const PAGE_SIZE = 10;
@@ -29,6 +30,19 @@ const STATUS_INFO = {
   in_progress: { text: 'Diproses',   bg: '#eff6ff', color: '#1d4ed8',  border: '#bfdbfe' },
   resolved:    { text: 'Selesai',    bg: '#f0fdf4', color: '#15803d',  border: '#bbf7d0' },
 };
+
+function cleanupUploadedFile(file) {
+  if (file && file.path && fs.existsSync(file.path)) {
+    fs.unlinkSync(file.path);
+  }
+}
+
+async function nextLogId() {
+  const [[{ nid }]] = await db.query(
+    'SELECT COALESCE(MAX(id), 0) + 1 AS nid FROM equipment_maintenance_request_log'
+  );
+  return nid;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /laporan — Daftar laporan kerusakan aset milik pengguna
@@ -166,22 +180,32 @@ const postStore = async (req, res, next) => {
     const userId = await getUserId(req);
     if (!userId) return res.redirect('/login');
 
-    const { equipment_id, issue_description, severity } = req.body;
+    const body = req.body || {};
+    const { equipment_id, issue_description, severity } = body;
 
     // Validasi
     const errors = [];
-    if (!equipment_id || equipment_id === '') {
+    if (!body.form_source) {
+      errors.push({
+        field: 'form_source',
+        msg: 'Data form tidak terbaca oleh server. Pastikan server sudah direstart setelah perubahan upload.',
+      });
+    } else if (!equipment_id || equipment_id === '') {
       errors.push({ field: 'equipment_id', msg: 'Silakan pilih peralatan.' });
     }
-    if (!issue_description || issue_description.trim() === '') {
+    if (body.form_source && (!issue_description || issue_description.trim() === '')) {
       errors.push({ field: 'issue_description', msg: 'Deskripsi masalah tidak boleh kosong.' });
     }
-    if (issue_description && issue_description.trim().length > 500) {
+    if (body.form_source && issue_description && issue_description.trim().length > 500) {
       errors.push({ field: 'issue_description', msg: 'Deskripsi tidak boleh lebih dari 500 karakter.' });
+    }
+    if (req.fileValidationError) {
+      errors.push({ field: 'foto_kerusakan', msg: req.fileValidationError });
     }
 
     // Jika ada error, render form kembali
     if (errors.length > 0) {
+      cleanupUploadedFile(req.file);
       const [equipments] = await db.query(
         `SELECT eq.id, a.name AS asset_name, a.code AS asset_code, eq.serial_number
          FROM equipments eq
@@ -197,7 +221,7 @@ const postStore = async (req, res, next) => {
         flash: null,
         equipments,
         errors,
-        old: req.body,
+        old: body,
         themeMode: 'light'
       });
     }
@@ -213,6 +237,7 @@ const postStore = async (req, res, next) => {
     }
 
     if (errors.length > 0) {
+      cleanupUploadedFile(req.file);
       const [equipments] = await db.query(
         `SELECT eq.id, a.name AS asset_name, a.code AS asset_code, eq.serial_number
          FROM equipments eq
@@ -228,7 +253,7 @@ const postStore = async (req, res, next) => {
         flash: null,
         equipments,
         errors,
-        old: req.body,
+        old: body,
         themeMode: 'light'
       });
     }
@@ -256,6 +281,17 @@ const postStore = async (req, res, next) => {
       [equipment_id, employeeId, issue_description.trim(), employeeId]
     );
 
+    if (req.file) {
+      const logId = await nextLogId();
+      const photoPath = `/uploads/laporan/${req.file.filename}`;
+      await db.query(
+        `INSERT INTO equipment_maintenance_request_log
+           (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, status, created_at, updated_at)
+         VALUES (?, ?, 'Laporan dibuat', ?, NOW(), ?, 'Foto kerusakan diunggah oleh pengguna saat membuat laporan.', 1, NOW(), NOW())`,
+        [logId, result.insertId, employeeId, photoPath]
+      );
+    }
+
     req.session.flash = {
       type: 'success',
       message: 'Laporan kerusakan aset berhasil dibuat. Tim maintenance akan segera memproses.'
@@ -263,6 +299,7 @@ const postStore = async (req, res, next) => {
 
     res.redirect('/laporan');
   } catch (err) {
+    cleanupUploadedFile(req.file);
     next(err);
   }
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const penggunaController = require('../controllers/penggunaController');
 const pdfController = require('../controllers/pdfController');
 const { isAuthenticated } = require('../middlewares/auth');
+const upload = require('../middlewares/upload');
 
 // Middleware: Pastikan user role adalah 'pengguna'
 router.use(isAuthenticated);
@@ -20,7 +21,7 @@ router.get('/', penggunaController.getList);
 router.get('/buat', penggunaController.getCreateForm);
 
 // POST /laporan — Simpan laporan kerusakan aset
-router.post('/', penggunaController.postStore);
+router.post('/', upload.fotoKerusakan, penggunaController.postStore);
 
 // GET /laporan/:id/pdf — Unduh bukti laporan kerusakan aset
 router.get('/:id/pdf', pdfController.buktiLaporan);

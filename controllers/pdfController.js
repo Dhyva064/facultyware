@@ -267,9 +267,9 @@ const buktiLaporan = async (req, res, next) => {
       [id]
     );
 
-    const initialLog = logs.find(lg => lg.status === 1);
+    const initialLog = logs.find(lg => Number(lg.status) === 1 && lg.log_file && lg.log_file !== '-');
     const photoUrl = initialLog && initialLog.log_file ? initialLog.log_file : null;
-    const imgPath = photoUrl ? path.join(__dirname, '../public', photoUrl) : null;
+    const imgPath = photoUrl ? path.join(__dirname, '../public', photoUrl.replace(/^\/+/, '')) : null;
     const hasPhoto = imgPath && fs.existsSync(imgPath);
 
     const doc = initDoc();

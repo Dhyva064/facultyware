@@ -45,7 +45,8 @@
   <% } %>
 
   <!-- Form -->
-  <form method="POST" action="/laporan" style="max-width:600px;">
+  <form method="POST" action="/laporan" enctype="multipart/form-data" style="max-width:600px;">
+    <input type="hidden" name="form_source" value="laporan_pengguna_create" />
     <!-- Equipment Selection -->
     <div style="margin-bottom:24px;">
       <label for="equipment_id" style="display:block;font-size:14px;font-weight:500;margin-bottom:8px;color:var(--foreground);">
@@ -123,6 +124,25 @@
           </label>
         <% }); %>
       </div>
+    </div>
+
+    <!-- Damage Photo -->
+    <div style="margin-bottom:24px;">
+      <label for="foto_kerusakan" style="display:block;font-size:14px;font-weight:500;margin-bottom:8px;color:var(--foreground);">
+        Foto Kerusakan
+      </label>
+      <input
+        type="file"
+        id="foto_kerusakan"
+        name="foto_kerusakan"
+        accept="image/jpeg,image/png,image/webp"
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--background);color:var(--foreground);box-sizing:border-box;<%= fieldError('foto_kerusakan') ? 'border-color:#dc2626;' : '' %>"
+      />
+      <% if (fieldError('foto_kerusakan')) { %>
+        <p style="font-size:13px;color:#dc2626;margin:6px 0 0 0;"><%= fieldError('foto_kerusakan') %></p>
+      <% } else { %>
+        <p style="font-size:13px;color:var(--muted-foreground);margin:6px 0 0 0;">Opsional. Format JPG, PNG, atau WEBP. Maksimal 2 MB.</p>
+      <% } %>
     </div>
 
     <!-- Form Actions -->
