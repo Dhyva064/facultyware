@@ -286,10 +286,6 @@ const buktiLaporan = async (req, res, next) => {
     doc.fillColor('#000000');
     doc.moveDown(0.4);
 
-    doc.fontSize(12).font('Cambria-Bold').text('Informasi Laporan', 40);
-    doc.moveTo(40, doc.y + 1).lineTo(555, doc.y + 1).lineWidth(0.5).stroke('#CCCCCC');
-    doc.moveDown(0.3);
-
     const fields = [
       ['Nama Pelapor',    laporan.reported_by_name],
       ['Email',           laporan.reported_by_email || '-'],
@@ -304,7 +300,12 @@ const buktiLaporan = async (req, res, next) => {
 
     fields.forEach(([label, val]) => {
       const y = doc.y;
-      drawField(doc, label, val, 40, 220, y);
+      doc.fontSize(12).font('Cambria-Bold')
+         .text(label, 40, y, { width: 165, lineBreak: false });
+      doc.fontSize(12).font('Cambria-Bold')
+         .text(':', 210, y, { width: 10, lineBreak: false });
+      doc.fontSize(12).font('Cambria')
+         .text(String(val || '-'), 230, y, { width: 325 });
       doc.moveDown(0.4);
     });
 
