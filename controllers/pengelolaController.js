@@ -1,3 +1,4 @@
+const fs = require('fs');
 const db = require('../lib/db');
 
 const PAGE_SIZE = 10;
@@ -25,6 +26,12 @@ function getFlash(req) {
   const flash = req.session.flash || null;
   delete req.session.flash;
   return flash;
+}
+
+function cleanupUploadedFile(file) {
+  if (file && file.path && fs.existsSync(file.path)) {
+    fs.unlinkSync(file.path);
+  }
 }
 
 async function fetchLogs(laporanId) {
@@ -181,7 +188,17 @@ const updateProgress = async (req, res, next) => {
     const logTitle = String(req.body.log || '').trim();
     const description = String(req.body.description || '').trim();
 
+    if (req.fileValidationError) {
+      cleanupUploadedFile(req.file);
+      req.session.flash = {
+        type: 'error',
+        message: req.fileValidationError,
+      };
+      return res.redirect(`/penugasan/${id}`);
+    }
+
     if (logTitle.length < 5 || description.length < 10) {
+      cleanupUploadedFile(req.file);
       req.session.flash = {
         type: 'error',
         message: 'Judul minimal 5 karakter dan catatan progres minimal 10 karakter.',
@@ -191,6 +208,7 @@ const updateProgress = async (req, res, next) => {
 
     const laporan = await fetchAssignment(id, employeeId, false);
     if (!laporan) {
+      cleanupUploadedFile(req.file);
       req.session.flash = {
         type: 'error',
         message: 'Penugasan tidak ditemukan, sudah selesai, atau bukan milik Anda.',
@@ -199,11 +217,12 @@ const updateProgress = async (req, res, next) => {
     }
 
     const logId = await nextLogId();
+    const photoPath = req.file ? `/uploads/laporan/${req.file.filename}` : null;
     await db.query(
       `INSERT INTO equipment_maintenance_request_log
-          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NOW(), ?, 3, NOW(), NOW())`,
-      [logId, id, logTitle.substring(0, 45), employeeId, description]
+          (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NOW(), ?, ?, 3, NOW(), NOW())`,
+      [logId, id, logTitle.substring(0, 45), employeeId, photoPath, description]
     );
 
     await db.query(
@@ -219,6 +238,7 @@ const updateProgress = async (req, res, next) => {
     };
     return res.redirect(`/penugasan/${id}`);
   } catch (err) {
+    cleanupUploadedFile(req.file);
     next(err);
   }
 };

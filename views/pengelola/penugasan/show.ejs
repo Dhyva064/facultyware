@@ -82,7 +82,7 @@
   <% if (!isResolved) { %>
     <div class="card" style="padding:24px;margin-bottom:20px;">
       <h2 style="font-size:15px;font-weight:700;margin-bottom:14px;">Update Riwayat Perbaikan</h2>
-      <form method="POST" action="/penugasan/<%= _l.id %>/progress">
+      <form method="POST" action="/penugasan/<%= _l.id %>/progress" enctype="multipart/form-data">
         <div style="display:grid;grid-template-columns:1fr;gap:12px;">
           <div>
             <label for="log" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Judul Progres</label>
@@ -95,6 +95,12 @@
             <textarea id="description" name="description" rows="4" required
                       placeholder="Tuliskan progres, tindakan perbaikan, atau hasil pemeriksaan..."
                       style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+          </div>
+          <div>
+            <label for="foto_bukti_hasil" style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Foto Bukti Hasil Akhir</label>
+            <input id="foto_bukti_hasil" name="foto_bukti_hasil" type="file" accept="image/jpeg,image/jpg,image/png,image/webp"
+                   style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:14px;"/>
+            <p style="font-size:12px;color:var(--muted-foreground);margin:6px 0 0 0;">Opsional. Format JPG, PNG, atau WEBP, maksimal 2 MB.</p>
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:16px;">
@@ -130,6 +136,16 @@
               </div>
               <% if (lg.log) { %><p style="font-size:13.5px;font-weight:500;margin-bottom:6px;"><%= lg.log %></p><% } %>
               <% if (lg.description) { %><p style="font-size:13.5px;color:var(--muted-foreground);line-height:1.6;margin:0;white-space:pre-wrap;"><%= lg.description %></p><% } %>
+              <% if (lg.log_file) { %>
+                <div style="margin-top:10px;">
+                  <a href="<%= lg.log_file %>" target="_blank"
+                     style="display:inline-block;border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+                    <img src="<%= lg.log_file %>" alt="Foto bukti hasil maintenance"
+                         style="max-width:280px;max-height:180px;object-fit:cover;display:block;"
+                         onerror="this.parentElement.style.display='none'"/>
+                  </a>
+                </div>
+              <% } %>
             </div>
           </div>
         <% }); %>
