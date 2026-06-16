@@ -17,7 +17,7 @@ var pjLaporanRouter = require('./routes/pj/laporan');
 var maintenanceRouter = require('./routes/pj/maintenance');
 var pengelolaRouter = require('./routes/pengelola');
 var progresRouter = require('./routes/progress');
-//var apiRouter = require('./routes/api');
+var apiRouter = require('./routes/api');
 
 const { notFoundHandler, errorHandler } = require('./middlewares/error');
 // [TEST MODE] Badge middleware belum tersedia, dinonaktifkan sementara
@@ -90,7 +90,7 @@ app.use('/pj/laporan', pjLaporanRouter);
 app.use('/maintenance', maintenanceRouter);
 app.use('/penugasan', pengelolaRouter);
 app.use('/progres', progresRouter);
-//app.use('/api/v1', apiRouter);
+app.use('/api', apiRouter);
 
 // catch 404 and forward to error handler
 app.use(notFoundHandler);

@@ -107,6 +107,15 @@
       </svg>
       Buat Permohonan
     </a>
+    <a href="/api/maintenance" target="_blank" rel="noopener noreferrer"
+       class="btn-outline"
+       title="Digunakan untuk pengujian API melalui browser/Postman"
+       style="display:inline-flex;align-items:center;gap:6px;font-size:13px;text-decoration:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+      </svg>
+      Demo API JSON
+    </a>
   </div>
   <% } %>
 </div>
@@ -116,11 +125,7 @@
   === DASHBOARD PENANGGUNG JAWAB (inline, tanpa partial terpisah) ===
 %>
 
-<!-- Filter cepat: Semua vs Laporan saya -->
-<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
-  <a href="/home?filter=all" class="dash-filter-btn <%= _filter === 'all' ? 'active' : 'inactive' %>">Semua Laporan</a>
-  <a href="/home?filter=my"  class="dash-filter-btn <%= _filter === 'my'  ? 'active' : 'inactive' %>">Laporan Saya</a>
-</div>
+
 
 <!-- Kartu statistik — grid responsif, tanpa border kaku -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px;">
