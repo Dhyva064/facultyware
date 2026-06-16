@@ -14,4 +14,10 @@ router.use(apiAuth);
 router.get('/maintenance', apiController.getMaintenance);
 router.get('/maintenance/:id', apiController.getMaintenanceById);
 
+// API JSON khusus demo modul Pengelola Aset:
+// GET http://localhost:3000/api/pengelola-aset/maintenance
+// GET http://localhost:3000/api/pengelola-aset/maintenance/1
+router.get('/pengelola-aset/maintenance', apiController.getPengelolaMaintenance);
+router.get('/pengelola-aset/maintenance/:id', apiController.getPengelolaMaintenanceById);
+
 module.exports = router;
