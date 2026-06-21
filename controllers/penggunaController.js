@@ -44,6 +44,22 @@ async function nextLogId() {
   return nid;
 }
 
+async function getDefaultPengelola() {
+  const [[pengelola]] = await db.query(
+    `SELECT e.id AS employee_id, u.id AS user_id
+     FROM employees e
+     JOIN model_has_roles mhr ON e.id = mhr.model_id
+     JOIN roles r ON mhr.role_id = r.id
+     JOIN users u ON u.id = mhr.model_id
+     WHERE r.name = 'pengelola_aset'
+       AND mhr.model_type = 'App\\\\Models\\\\User'
+     ORDER BY e.id ASC
+     LIMIT 1`
+  );
+
+  return pengelola || null;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /laporan — Daftar laporan kerusakan aset milik pengguna
 // ══════════════════════════════════════════════════════════════════════════════
@@ -57,24 +73,9 @@ const getList = async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const offset = (page - 1) * PAGE_SIZE;
 
-    // Tentukan employee ID untuk filter laporan
-    let reportedByEmployeeId = userId;
-    const [[userAsEmployee]] = await db.query(
-      'SELECT id FROM employees WHERE id = ?',
-      [userId]
-    );
-    
-    if (!userAsEmployee) {
-      // Jika user bukan employee, gunakan default employee
-      const [[defaultEmployee]] = await db.query(
-        'SELECT id FROM employees LIMIT 1'
-      );
-      reportedByEmployeeId = defaultEmployee?.id || 1;
-    }
-
     // Build WHERE clause
     const whereParts = ['emr.reported_by = ?'];
-    const params = [reportedByEmployeeId];
+    const params = [userId];
 
     if (search) {
       whereParts.push('(a.name LIKE ? OR emr.issue_description LIKE ?)');
@@ -258,27 +259,27 @@ const postStore = async (req, res, next) => {
       });
     }
 
-    // Simpan ke database
-    // Ambil employee_id dari employee yang sesuai atau default employee
-    let employeeId = userId;  // Try using userId as employee_id first
-    const [[userAsEmployee]] = await db.query(
-      'SELECT id FROM employees WHERE id = ?',
-      [userId]
-    );
-    
-    if (!userAsEmployee) {
-      // Jika user bukan employee, gunakan default employee (PJ/pengelola)
-      const [[defaultEmployee]] = await db.query(
-        'SELECT id FROM employees LIMIT 1'
-      );
-      employeeId = defaultEmployee?.id || 1;
+    const pengelola = await getDefaultPengelola();
+    if (!pengelola) {
+      cleanupUploadedFile(req.file);
+      return res.render('pengguna/laporan/create', {
+        title: 'Buat Laporan Kerusakan Aset',
+        currentPath: '/laporan',
+        userRole: req.session.userRole,
+        userName: req.session.username,
+        flash: null,
+        equipments: [],
+        errors: [{ field: 'equipment_id', msg: 'Belum ada pengelola aset yang tersedia.' }],
+        old: body,
+        themeMode: 'light'
+      });
     }
     
     const [result] = await db.query(
       `INSERT INTO equipment_maintenance_requests 
        (equipment_id, reported_by, issue_description, status, employee_id, reported_at, created_at, updated_at)
        VALUES (?, ?, ?, 'reported', ?, NOW(), NOW(), NOW())`,
-      [equipment_id, employeeId, issue_description.trim(), employeeId]
+      [equipment_id, userId, issue_description.trim(), pengelola.employee_id]
     );
 
     if (req.file) {
@@ -288,7 +289,7 @@ const postStore = async (req, res, next) => {
         `INSERT INTO equipment_maintenance_request_log
            (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, status, created_at, updated_at)
          VALUES (?, ?, 'Laporan dibuat', ?, NOW(), ?, 'Foto kerusakan diunggah oleh pengguna saat membuat laporan.', 1, NOW(), NOW())`,
-        [logId, result.insertId, employeeId, photoPath]
+        [logId, result.insertId, pengelola.user_id, photoPath]
       );
     }
 
@@ -314,35 +315,27 @@ const getDetail = async (req, res, next) => {
 
     const laporanId = req.params.id;
 
-    // Tentukan employee ID untuk filter laporan
-    let reportedByEmployeeId = userId;
-    const [[userAsEmployee]] = await db.query(
-      'SELECT id FROM employees WHERE id = ?',
-      [userId]
-    );
-    
-    if (!userAsEmployee) {
-      // Jika user bukan employee, gunakan default employee
-      const [[defaultEmployee]] = await db.query(
-        'SELECT id FROM employees LIMIT 1'
-      );
-      reportedByEmployeeId = defaultEmployee?.id || 1;
-    }
-
     // Ambil detail laporan
     const [[laporan]] = await db.query(
       `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
               e.serial_number, emr.issue_description,
               emr.status, emr.reported_at, emr.created_at,
-              e_reporter.name AS reported_by_name,
-              e_pengelola.name AS pengelola_name
+              u_reporter.name AS reported_by_name,
+              pengelola.name AS pengelola_name
        FROM equipment_maintenance_requests emr
        JOIN equipments e ON emr.equipment_id = e.id
        JOIN assets a ON e.asset_id = a.id
-       JOIN employees e_reporter ON emr.reported_by = e_reporter.id
-       LEFT JOIN employees e_pengelola ON emr.employee_id = e_pengelola.id
+       JOIN users u_reporter ON emr.reported_by = u_reporter.id
+       LEFT JOIN (
+         SELECT e.id, e.name
+         FROM employees e
+         JOIN model_has_roles mhr ON e.id = mhr.model_id
+         JOIN roles r ON mhr.role_id = r.id
+         WHERE r.name = 'pengelola_aset'
+           AND mhr.model_type = 'App\\\\Models\\\\User'
+       ) pengelola ON emr.employee_id = pengelola.id
        WHERE emr.id = ? AND emr.reported_by = ?`,
-      [laporanId, reportedByEmployeeId]
+      [laporanId, userId]
     );
 
     if (!laporan) {

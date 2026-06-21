@@ -7,13 +7,13 @@ const maintenanceSelect = `
     a.name AS nama_aset,
     a.code AS kode_aset,
     eq.brand AS merek_peralatan,
-    COALESCE(e.name, '-') AS pelapor,
+    COALESCE(u.name, '-') AS pelapor,
     emr.status,
     emr.issue_description AS deskripsi_kerusakan
   FROM equipment_maintenance_requests emr
   JOIN equipments eq ON emr.equipment_id = eq.id
   JOIN assets a ON eq.asset_id = a.id
-  LEFT JOIN employees e ON emr.reported_by = e.id
+  LEFT JOIN users u ON emr.reported_by = u.id
 `;
 
 const getMaintenance = async (req, res, next) => {
@@ -72,8 +72,15 @@ const pengelolaMaintenanceSelect = `
   FROM equipment_maintenance_requests emr
   JOIN equipments eq ON emr.equipment_id = eq.id
   JOIN assets a ON eq.asset_id = a.id
-  LEFT JOIN employees pelapor ON emr.reported_by = pelapor.id
-  LEFT JOIN employees pengelola ON emr.employee_id = pengelola.id
+  LEFT JOIN users pelapor ON emr.reported_by = pelapor.id
+  LEFT JOIN (
+    SELECT e.id, e.name
+    FROM employees e
+    JOIN model_has_roles mhr ON e.id = mhr.model_id
+    JOIN roles r ON mhr.role_id = r.id
+    WHERE r.name = 'pengelola_aset'
+      AND mhr.model_type = 'App\\\\Models\\\\User'
+  ) pengelola ON emr.employee_id = pengelola.id
 `;
 
 // API Pengelola Aset untuk testing Postman:
@@ -130,8 +137,15 @@ const getPengelolaMaintenanceById = async (req, res, next) => {
       FROM equipment_maintenance_requests emr
       JOIN equipments eq ON emr.equipment_id = eq.id
       JOIN assets a ON eq.asset_id = a.id
-      LEFT JOIN employees pelapor ON emr.reported_by = pelapor.id
-      LEFT JOIN employees pengelola ON emr.employee_id = pengelola.id
+      LEFT JOIN users pelapor ON emr.reported_by = pelapor.id
+      LEFT JOIN (
+        SELECT e.id, e.name
+        FROM employees e
+        JOIN model_has_roles mhr ON e.id = mhr.model_id
+        JOIN roles r ON mhr.role_id = r.id
+        WHERE r.name = 'pengelola_aset'
+          AND mhr.model_type = 'App\\\\Models\\\\User'
+      ) pengelola ON emr.employee_id = pengelola.id
       WHERE emr.id = ?
       LIMIT 1
     `, [id]);
@@ -153,7 +167,7 @@ const getPengelolaMaintenanceById = async (req, res, next) => {
         emrl.logged_at AS tanggal_progress,
         COALESCE(petugas.name, '-') AS petugas
       FROM equipment_maintenance_request_log emrl
-      LEFT JOIN employees petugas ON emrl.logged_by = petugas.id
+      LEFT JOIN users petugas ON emrl.logged_by = petugas.id
       WHERE emrl.equipment_maintenance_request_id = ?
       ORDER BY emrl.logged_at ASC, emrl.created_at ASC, emrl.id ASC
     `, [id]);

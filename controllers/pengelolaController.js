@@ -37,10 +37,9 @@ function cleanupUploadedFile(file) {
 async function fetchLogs(laporanId) {
   const [logs] = await db.query(
     `SELECT emrl.*,
-            COALESCE(e.name, u.name) AS logged_by_name,
+            u.name AS logged_by_name,
             COALESCE(ev.name, uv.name) AS verified_by_name
      FROM equipment_maintenance_request_log emrl
-     LEFT JOIN employees e ON emrl.logged_by = e.id
      LEFT JOIN users u ON emrl.logged_by = u.id
      LEFT JOIN employees ev ON emrl.verified_by = ev.id
      LEFT JOIN users uv ON emrl.verified_by = uv.id
@@ -60,14 +59,20 @@ async function fetchAssignment(id, employeeId, includeResolved = false) {
     `SELECT emr.id, emr.issue_description, emr.status, emr.reported_at, emr.resolved_at,
             a.name AS equipment_name, a.code AS equipment_code,
             eq.serial_number,
-            COALESCE(e_reporter.name, u_reporter.name) AS reported_by_name,
-            e_pengelola.name AS pengelola_name
+            u_reporter.name AS reported_by_name,
+            pengelola.name AS pengelola_name
      FROM equipment_maintenance_requests emr
      JOIN equipments eq ON emr.equipment_id = eq.id
      JOIN assets a ON eq.asset_id = a.id
-     LEFT JOIN employees e_reporter ON emr.reported_by = e_reporter.id
      LEFT JOIN users u_reporter ON emr.reported_by = u_reporter.id
-     LEFT JOIN employees e_pengelola ON emr.employee_id = e_pengelola.id
+     LEFT JOIN (
+       SELECT e.id, e.name
+       FROM employees e
+       JOIN model_has_roles mhr ON e.id = mhr.model_id
+       JOIN roles r ON mhr.role_id = r.id
+       WHERE r.name = 'pengelola_aset'
+         AND mhr.model_type = 'App\\\\Models\\\\User'
+     ) pengelola ON emr.employee_id = pengelola.id
      WHERE emr.id = ?
        AND emr.employee_id = ?
        AND ${statusClause}`,
@@ -105,7 +110,7 @@ async function listAssignments(req, status, view, title, currentPath) {
   const [penugasan] = await db.query(
     `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
             emr.issue_description, emr.status, emr.reported_at, emr.resolved_at,
-            COALESCE(e_reporter.name, u_reporter.name) AS reported_by_name,
+            u_reporter.name AS reported_by_name,
             (SELECT COUNT(*) FROM equipment_maintenance_request_log
              WHERE equipment_maintenance_request_id = emr.id) AS log_count,
             (SELECT status FROM equipment_maintenance_request_log
@@ -114,7 +119,6 @@ async function listAssignments(req, status, view, title, currentPath) {
      FROM equipment_maintenance_requests emr
      JOIN equipments eq ON emr.equipment_id = eq.id
      JOIN assets a ON eq.asset_id = a.id
-     LEFT JOIN employees e_reporter ON emr.reported_by = e_reporter.id
      LEFT JOIN users u_reporter ON emr.reported_by = u_reporter.id
      ${where}
      ORDER BY ${status === 'resolved' ? 'emr.resolved_at DESC, emr.updated_at DESC' : 'emr.reported_at DESC'}
@@ -222,7 +226,7 @@ const updateProgress = async (req, res, next) => {
       `INSERT INTO equipment_maintenance_request_log
           (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, NOW(), ?, ?, 3, NOW(), NOW())`,
-      [logId, id, logTitle.substring(0, 45), employeeId, photoPath, description]
+      [logId, id, logTitle.substring(0, 45), req.session.userId, photoPath, description]
     );
 
     await db.query(

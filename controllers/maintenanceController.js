@@ -52,7 +52,6 @@ const index = async (req, res, next) => {
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
-       LEFT JOIN employees e_resp ON emr.employee_id = e_resp.id
        ${where}`,
       params
     );
@@ -60,7 +59,7 @@ const index = async (req, res, next) => {
     const [maintenance] = await db.query(
       `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
               emr.issue_description, emr.status, emr.reported_at,
-              e_resp.name AS pengelola_name,
+              pengelola.name AS pengelola_name,
               (SELECT COUNT(*) FROM equipment_maintenance_request_log
                WHERE equipment_maintenance_request_id = emr.id) AS log_count,
               (SELECT status FROM equipment_maintenance_request_log
@@ -69,7 +68,14 @@ const index = async (req, res, next) => {
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
-       LEFT JOIN employees e_resp ON emr.employee_id = e_resp.id
+       LEFT JOIN (
+         SELECT e.id, e.name
+         FROM employees e
+         JOIN model_has_roles mhr ON e.id = mhr.model_id
+         JOIN roles r ON mhr.role_id = r.id
+         WHERE r.name = 'pengelola_aset'
+           AND mhr.model_type = 'App\\\\Models\\\\User'
+       ) pengelola ON emr.employee_id = pengelola.id
        ${where}
        ORDER BY emr.reported_at DESC
        LIMIT ? OFFSET ?`,
@@ -230,12 +236,19 @@ const show = async (req, res, next) => {
       `SELECT emr.id, emr.issue_description, emr.status, emr.reported_at, emr.resolved_at,
               a.name AS equipment_name, a.code AS equipment_code,
               e_by.name AS reported_by_name,
-              e_pengelola.name AS pengelola_name
+              pengelola.name AS pengelola_name
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
        JOIN users e_by ON emr.reported_by = e_by.id
-       LEFT JOIN employees e_pengelola ON emr.employee_id = e_pengelola.id
+       LEFT JOIN (
+         SELECT e.id, e.name
+         FROM employees e
+         JOIN model_has_roles mhr ON e.id = mhr.model_id
+         JOIN roles r ON mhr.role_id = r.id
+         WHERE r.name = 'pengelola_aset'
+           AND mhr.model_type = 'App\\\\Models\\\\User'
+       ) pengelola ON emr.employee_id = pengelola.id
        WHERE emr.id = ?`,
       [id]
     );

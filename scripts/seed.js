@@ -142,11 +142,31 @@ async function seedOrganizationUnits() {
 async function seedUsers() {
   log('Seeding users...');
   const hashedPassword = await bcrypt.hash('password123', 10);
+
+  await db.query('SET FOREIGN_KEY_CHECKS = 0');
+  await db.query("DELETE FROM model_has_roles WHERE model_id IN (SELECT id FROM users WHERE email IN ('pj2@ftiunand.ac.id'))");
+  await db.query("DELETE FROM employees WHERE employee_number = 'EMP003' OR name = 'Eka Putri'");
+  await db.query("DELETE FROM users WHERE email = 'pj2@ftiunand.ac.id' OR name = 'Eka Putri'");
+
+  const [[oldSiti]] = await db.query("SELECT id FROM users WHERE email = 'pengguna@ftiunand.ac.id'");
+  const [[newSiti]] = await db.query("SELECT id FROM users WHERE email = 'pengguna2@ftiunand.ac.id'");
+  if (oldSiti && !newSiti) {
+    await db.query(
+      "UPDATE users SET name = 'Siti', email = 'pengguna2@ftiunand.ac.id', updated_at = NOW() WHERE id = ?",
+      [oldSiti.id]
+    );
+  } else if (oldSiti && newSiti) {
+    await db.query("DELETE FROM model_has_roles WHERE model_id = ?", [oldSiti.id]);
+    await db.query("DELETE FROM students WHERE id = ?", [oldSiti.id]);
+    await db.query("DELETE FROM users WHERE id = ?", [oldSiti.id]);
+  }
+  await db.query('SET FOREIGN_KEY_CHECKS = 1');
+
   const users = [
-    { name: 'Siti',           email: 'pengguna@ftiunand.ac.id' }, // Berhasil disesuaikan ke Siti
+    { name: 'Siti',           email: 'pengguna2@ftiunand.ac.id' },
+    { name: 'Riri Rahayu',    email: 'pengguna1@ftiunand.ac.id' },
     { name: 'Citra Maharani', email: 'pj@ftiunand.ac.id' },
     { name: 'Deni Saputra',   email: 'pengelola@ftiunand.ac.id' },
-    { name: 'Eka Putri',      email: 'pj2@ftiunand.ac.id' },
   ];
 
   for (const user of users) {
@@ -158,7 +178,11 @@ async function seedUsers() {
       );
       ok(`User "${user.name}" (${user.email}) dibuat`);
     } else {
-      skip(`User "${user.name}" (${user.email})`);
+      await db.query(
+        'UPDATE users SET name = ?, password = ?, updated_at = NOW() WHERE email = ?',
+        [user.name, hashedPassword, user.email]
+      );
+      ok(`User "${user.name}" (${user.email}) diperbarui`);
     }
   }
 }
@@ -177,11 +201,24 @@ async function seedEmployees() {
     return;
   }
 
+  const [[userRiri]]  = await db.query("SELECT id FROM users WHERE email = 'pengguna1@ftiunand.ac.id'");
   const [[userCitra]] = await db.query("SELECT id FROM users WHERE email = 'pj@ftiunand.ac.id'");
   const [[userDeni]]  = await db.query("SELECT id FROM users WHERE email = 'pengelola@ftiunand.ac.id'");
-  const [[userEka]]   = await db.query("SELECT id FROM users WHERE email = 'pj2@ftiunand.ac.id'");
 
   const employees = [
+    {
+      userId: userRiri?.id,
+      employee_number: 'EMP004',
+      name: 'Riri Rahayu',
+      birth_place: 'Padang',
+      birth_date: '1992-02-14',
+      gender: 'female',
+      marital_status: 'single',
+      address: 'Jl. Limau Manis No. 7',
+      organization_unit_id: unitSI.id,
+      hire_date: '2018-08-01',
+      employment_status_id: statDosen.id,
+    },
     {
       userId: userCitra?.id,
       employee_number: 'EMP001',
@@ -207,23 +244,11 @@ async function seedEmployees() {
       organization_unit_id: unitSarana.id,
       hire_date: '2008-06-01',
       employment_status_id: statTK.id,
-    },
-    {
-      userId: userEka?.id,
-      employee_number: 'EMP003',
-      name: 'Eka Putri',
-      birth_place: 'Pariaman',
-      birth_date: '1990-07-20',
-      gender: 'female',
-      marital_status: 'single',
-      address: 'Jl. Limau Manis No. 3',
-      organization_unit_id: unitSI.id,
-      hire_date: '2015-03-01',
-      employment_status_id: statDosen.id,
     }
   ];
 
   await db.query('SET FOREIGN_KEY_CHECKS = 0');
+  await db.query("DELETE FROM employees WHERE employee_number = 'EMP003' OR name = 'Eka Putri'");
 
   for (const emp of employees) {
     if (!emp.userId) { warn(`User untuk ${emp.name} (${emp.employee_number}) tidak ditemukan di DB, lewati`); continue; }
@@ -244,7 +269,19 @@ async function seedEmployees() {
       );
       ok(`Employee "${emp.name}" (${emp.employee_number}) dibuat dengan id=${emp.userId}`);
     } else {
-      skip(`Employee "${emp.name}" (${emp.employee_number})`);
+      await db.query(
+        `UPDATE employees
+         SET id = ?, name = ?, birth_place = ?, birth_date = ?, gender = ?, marital_status = ?,
+             address = ?, organization_unit_id = ?, hire_date = ?, employment_status_id = ?,
+             status = 'active', updated_at = NOW()
+         WHERE employee_number = ?`,
+        [
+          emp.userId, emp.name, emp.birth_place, emp.birth_date, emp.gender,
+          emp.marital_status, emp.address, emp.organization_unit_id,
+          emp.hire_date, emp.employment_status_id, emp.employee_number
+        ]
+      );
+      ok(`Employee "${emp.name}" (${emp.employee_number}) diperbarui`);
     }
   }
 
@@ -254,20 +291,26 @@ async function seedEmployees() {
 // ─── 8. STUDENTS ─────────────────────────────────────────────
 async function seedStudents() {
   log('Seeding students...');
-  // Mencari ID User berdasarkan email Siti (pengguna@ftiunand.ac.id)
-  const [[user]] = await db.query("SELECT id FROM users WHERE email = 'pengguna@ftiunand.ac.id'");
-  if (!user) { warn('User pengguna@ftiunand.ac.id tidak ditemukan'); return; }
+  const [[user]] = await db.query("SELECT id FROM users WHERE email = 'pengguna2@ftiunand.ac.id'");
+  if (!user) { warn('User pengguna2@ftiunand.ac.id tidak ditemukan'); return; }
 
   const [rows] = await db.query('SELECT id FROM students WHERE regno = ?', ['2410000004']);
   if (rows.length === 0) {
     await db.query(
       `INSERT INTO students (id, name, regno, email, campus_email, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      [user.id, 'Siti', '2410000004', 'pengguna@ftiunand.ac.id', '2110000001@student.ftiunand.ac.id']
+      [user.id, 'Siti', '2410000004', 'pengguna2@ftiunand.ac.id', '2110000001@student.ftiunand.ac.id']
     );
     ok(`Student "Siti" dibuat (id=${user.id})`);
   } else {
-    skip('Student "Siti" (2410000004)');
+    await db.query(
+      `UPDATE students
+       SET id = ?, name = 'Siti', email = 'pengguna2@ftiunand.ac.id',
+           campus_email = '2110000001@student.ftiunand.ac.id', updated_at = NOW()
+       WHERE regno = '2410000004'`,
+      [user.id]
+    );
+    ok('Student "Siti" (2410000004) diperbarui');
   }
 }
 
@@ -275,16 +318,26 @@ async function seedStudents() {
 async function seedModelHasRoles() {
   log('Seeding model_has_roles...');
 
-  const [[uSiti]]      = await db.query("SELECT id FROM users WHERE email = 'pengguna@ftiunand.ac.id'");
+  const [[uSiti]]      = await db.query("SELECT id FROM users WHERE email = 'pengguna2@ftiunand.ac.id'");
+  const [[uRiri]]      = await db.query("SELECT id FROM users WHERE email = 'pengguna1@ftiunand.ac.id'");
   const [[uPj]]        = await db.query("SELECT id FROM users WHERE email = 'pj@ftiunand.ac.id'");
   const [[uPengelola]] = await db.query("SELECT id FROM users WHERE email = 'pengelola@ftiunand.ac.id'");
-  const [[uPj2]]       = await db.query("SELECT id FROM users WHERE email = 'pj2@ftiunand.ac.id'");
 
   const assignments = [];
   if (uSiti)      assignments.push({ role_id: 1, model_id: uSiti.id });      // Siti -> role pengguna (1)
+  if (uRiri)      assignments.push({ role_id: 1, model_id: uRiri.id });      // Riri Rahayu -> role pengguna (1)
   if (uPj)        assignments.push({ role_id: 2, model_id: uPj.id });        // Citra Maharani -> role penanggung_jawab (2)
   if (uPengelola) assignments.push({ role_id: 3, model_id: uPengelola.id }); // Deni Saputra -> role pengelola_aset (3)
-  if (uPj2)       assignments.push({ role_id: 2, model_id: uPj2.id });       // Eka Putri -> role penanggung_jawab (2)
+
+  const targetIds = assignments.map(a => a.model_id);
+  if (targetIds.length > 0) {
+    await db.query(
+      `DELETE FROM model_has_roles
+       WHERE model_type = 'App\\\\Models\\\\User'
+         AND model_id IN (${targetIds.map(() => '?').join(',')})`,
+      targetIds
+    );
+  }
 
   for (const a of assignments) {
     const [ex] = await db.query(
@@ -381,12 +434,21 @@ async function seedEquipments() {
 // ─── 13. ROOMS ────────────────────────────────────────────────────────────────
 async function seedRooms() {
   log('Seeding rooms...');
+
+  const [[citra]] = await db.query("SELECT id FROM employees WHERE employee_number = 'EMP001'");
+  const [[deni]]  = await db.query("SELECT id FROM employees WHERE employee_number = 'EMP002'");
+
+  if (!citra || !deni) {
+    warn('Employee Citra/Deni belum lengkap, rooms dilewati');
+    return;
+  }
+
   const rooms = [
-    { id: 1, asset_id: 1, building_id: 2, name: 'Lab Komputer A', code: 'LABA', floor: '1', capacity: 40, is_public: 1, responsible_employee_id: 2, employee_id: 2 },
-    { id: 2, asset_id: 2, building_id: 2, name: 'Lab Komputer B', code: 'LABB', floor: '1', capacity: 40, is_public: 1, responsible_employee_id: 2, employee_id: 2 },
-    { id: 3, asset_id: 3, building_id: 2, name: 'Lab Jaringan', code: 'LABJ', floor: '2', capacity: 30, is_public: 1, responsible_employee_id: 2, employee_id: 2 },
-    { id: 4, asset_id: 4, building_id: 1, name: 'Ruang Dosen SI', code: 'RDSI', floor: '2', capacity: 20, is_public: 0, responsible_employee_id: 4, employee_id: 4 },
-    { id: 5, asset_id: 5, building_id: 1, name: 'Ruang Seminar FTI', code: 'RSFTI', floor: '1', capacity: 100, is_public: 1, responsible_employee_id: 4, employee_id: 4 }
+    { id: 1, asset_id: 1, building_id: 2, name: 'Lab Komputer A', code: 'LABA', floor: '1', capacity: 40, is_public: 1, responsible_employee_id: deni.id, employee_id: deni.id },
+    { id: 2, asset_id: 2, building_id: 2, name: 'Lab Komputer B', code: 'LABB', floor: '1', capacity: 40, is_public: 1, responsible_employee_id: deni.id, employee_id: deni.id },
+    { id: 3, asset_id: 3, building_id: 2, name: 'Lab Jaringan', code: 'LABJ', floor: '2', capacity: 30, is_public: 1, responsible_employee_id: deni.id, employee_id: deni.id },
+    { id: 4, asset_id: 4, building_id: 1, name: 'Ruang Dosen SI', code: 'RDSI', floor: '2', capacity: 20, is_public: 0, responsible_employee_id: citra.id, employee_id: citra.id },
+    { id: 5, asset_id: 5, building_id: 1, name: 'Ruang Seminar FTI', code: 'RSFTI', floor: '1', capacity: 100, is_public: 1, responsible_employee_id: citra.id, employee_id: citra.id }
   ];
 
   for (const r of rooms) {
@@ -400,7 +462,14 @@ async function seedRooms() {
       );
       ok(`Room "${r.name}" terbuat.`);
     } else {
-      skip(`Room "${r.name}"`);
+      await db.query(
+        `UPDATE rooms
+         SET asset_id = ?, building_id = ?, name = ?, code = ?, floor = ?, capacity = ?,
+             is_public = ?, responsible_employee_id = ?, employee_id = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [r.asset_id, r.building_id, r.name, r.code, r.floor, r.capacity, r.is_public, r.responsible_employee_id, r.employee_id, r.id]
+      );
+      ok(`Room "${r.name}" diperbarui`);
     }
   }
 }
@@ -415,6 +484,22 @@ async function seedTransactions() {
   await db.query('SET FOREIGN_KEY_CHECKS = 1');
   ok("Tabel transaksi permohonan & log dibersihkan (Fresh State).");
 
+const [[siti]] = await db.query(
+  "SELECT id FROM users WHERE email = 'pengguna2@ftiunand.ac.id'"
+);
+
+const [[riri]] = await db.query(
+  "SELECT id FROM users WHERE email = 'pengguna1@ftiunand.ac.id'"
+);
+
+const [[userCitraLog]] = await db.query(
+  "SELECT id FROM users WHERE email = 'pj@ftiunand.ac.id'"
+);
+
+const [[userDeniLog]] = await db.query(
+  "SELECT id FROM users WHERE email = 'pengelola@ftiunand.ac.id'"
+);
+
 const [[citra]] = await db.query(
   "SELECT id FROM employees WHERE employee_number = 'EMP001'"
 );
@@ -423,21 +508,30 @@ const [[deni]] = await db.query(
   "SELECT id FROM employees WHERE employee_number = 'EMP002'"
 );
 
-const [[eka]] = await db.query(
-  "SELECT id FROM employees WHERE employee_number = 'EMP003'"
-);
+if (!siti || !riri || !userCitraLog || !userDeniLog || !citra || !deni) {
+  throw new Error('Data user/employee maintenance belum lengkap untuk seed transaksi.');
+}
 
-const idPembawaLaporan = citra.id;
-const idPj             = eka.id;
-const idPengelola      = deni.id;
+const idSiti      = siti.id;
+const idRiri      = riri.id;
+const idUserCitra = userCitraLog.id;
+const idUserDeni  = userDeniLog.id;
+const idCitra     = citra.id;
+const idDeni      = deni.id;
 
   const requests = [
-    { id: 1, equipment_id: 2, reported_by: idPembawaLaporan, issue_description: 'Proyektor tidak menyala saat digunakan', status: 'reported', employee_id: idPj, reported_at: '2026-06-09 15:50:02' },
-    { id: 2, equipment_id: 4, reported_by: idPembawaLaporan, issue_description: 'Printer mengalami paper jam', status: 'reported', employee_id: idPengelola, reported_at: '2026-06-09 15:50:02' },
-    { id: 3, equipment_id: 1, reported_by: idPj,             issue_description: 'Laptop berjalan lambat saat digunakan', status: 'in_progress', employee_id: idPengelola, reported_at: '2026-06-09 15:50:02' },
-    { id: 4, equipment_id: 3, reported_by: idPj,             issue_description: 'AC tidak mengeluarkan udara dingin', status: 'in_progress', employee_id: idPengelola, reported_at: '2026-06-09 15:50:02' },
-    { id: 5, equipment_id: 5, reported_by: idPengelola,      issue_description: 'Laptop berhasil diperbaiki dan kembali normal', status: 'resolved', employee_id: idPengelola, reported_at: '2026-06-09 15:50:02', resolved_at: '2026-06-08 15:26:00' }
-  ];
+    // ===== MEI 2026 =====
+    { id: 1, equipment_id: 2, reported_by: idSiti, issue_description: 'Proyektor tidak menyala saat digunakan', status: 'reported', employee_id: idDeni, reported_at: '2026-05-09 15:50:02' },
+    { id: 2, equipment_id: 4, reported_by: idRiri, issue_description: 'Printer mengalami paper jam', status: 'reported', employee_id: idDeni, reported_at: '2026-05-12 10:30:00' },
+    { id: 3, equipment_id: 1, reported_by: idSiti, issue_description: 'Laptop berjalan lambat saat digunakan', status: 'in_progress', employee_id: idDeni, reported_at: '2026-05-15 09:15:00' },
+    { id: 4, equipment_id: 3, reported_by: idRiri, issue_description: 'AC tidak mengeluarkan udara dingin', status: 'in_progress', employee_id: idDeni, reported_at: '2026-05-20 14:45:00' },
+
+    // ===== JUNI 2026 =====
+    { id: 5, equipment_id: 5, reported_by: idSiti, issue_description: 'Laptop berhasil diperbaiki dan kembali normal', status: 'resolved', employee_id: idDeni, reported_at: '2026-06-03 08:00:00', resolved_at: '2026-06-04 15:26:00' },
+    { id: 6, equipment_id: 2, reported_by: idRiri, issue_description: 'Proyektor berkedip saat presentasi', status: 'reported', employee_id: idDeni, reported_at: '2026-06-10 11:00:00' },
+    { id: 7, equipment_id: 3, reported_by: idSiti, issue_description: 'AC mengeluarkan suara berisik saat digunakan', status: 'reported', employee_id: idDeni, reported_at: '2026-06-15 09:30:00' },
+    { id: 8, equipment_id: 1, reported_by: idRiri, issue_description: 'Keyboard laptop tidak berfungsi pada beberapa tombol', status: 'resolved', employee_id: idDeni, reported_at: '2026-06-18 13:00:00', resolved_at: '2026-06-19 15:00:00' }
+];
 
   for (const req of requests) {
     await db.query(
@@ -447,15 +541,23 @@ const idPengelola      = deni.id;
       [req.id, req.equipment_id, req.reported_by, req.issue_description, req.status, req.reported_at, req.resolved_at || null, req.employee_id]
     );
   }
-  ok("5 Data Induk Permohonan Perbaikan Aset ditambah.");
+  ok("8 Data Induk Permohonan Perbaikan Aset ditambah.");
 
   const logs = [
-    { id: 1, equipment_maintenance_request_id: 1, log: 'Laporan diterima', logged_by: idPj, logged_at: '2026-05-23 08:00:00', verified_by: idPengelola, verified_at: '2026-05-23 08:00:00', description: 'Menunggu pemeriksaan', status: '0' },
-    { id: 2, equipment_maintenance_request_id: 1, log: 'Pemeriksaan awal', logged_by: idPj, logged_at: '2026-05-23 09:00:00', verified_by: idPengelola, verified_at: '2026-05-23 09:00:00', description: 'Sedang diperiksa', status: '1' },
-    { id: 3, equipment_maintenance_request_id: 2, log: 'Laporan printer', logged_by: idPj, logged_at: '2026-05-23 10:00:00', verified_by: idPengelola, verified_at: '2026-05-23 10:00:00', description: 'Kerusakan teridentifikasi', status: '0' },
-    { id: 4, equipment_maintenance_request_id: 3, log: 'Perbaikan laptop', logged_by: idPengelola, logged_at: '2026-05-23 11:00:00', verified_by: idPj, verified_at: '2026-05-23 11:00:00', description: 'Penggantian komponen', status: '1' },
-    { id: 5, equipment_maintenance_request_id: 5, log: 'Perbaikan selesai', logged_by: idPengelola, logged_at: '2026-05-24 08:00:00', verified_by: idPj, verified_at: '2026-05-24 08:00:00', description: 'Alat kembali normal', status: '2' }
-  ];
+  // ===== MEI =====
+  { id: 1, equipment_maintenance_request_id: 1, log: 'Laporan diterima', logged_by: idUserCitra, logged_at: '2026-05-09 16:00:00', verified_by: idDeni, verified_at: '2026-05-09 16:00:00', description: 'Menunggu pemeriksaan', status: '0' },
+  { id: 2, equipment_maintenance_request_id: 2, log: 'Laporan printer', logged_by: idUserCitra, logged_at: '2026-05-12 11:00:00', verified_by: idDeni, verified_at: '2026-05-12 11:00:00', description: 'Kerusakan teridentifikasi', status: '0' },
+  { id: 3, equipment_maintenance_request_id: 3, log: 'Perbaikan laptop', logged_by: idUserDeni, logged_at: '2026-05-15 10:00:00', verified_by: idCitra, verified_at: '2026-05-15 10:00:00', description: 'Penggantian komponen sedang berlangsung', status: '1' },
+  { id: 4, equipment_maintenance_request_id: 4, log: 'Perbaikan AC', logged_by: idUserDeni, logged_at: '2026-05-20 15:30:00', verified_by: idCitra, verified_at: '2026-05-20 15:30:00', description: 'Pembersihan evaporator dan freon', status: '1' },
+
+  // ===== JUNI =====
+  { id: 5, equipment_maintenance_request_id: 5, log: 'Perbaikan selesai', logged_by: idUserDeni, logged_at: '2026-06-04 09:00:00', verified_by: idCitra, verified_at: '2026-06-04 09:00:00', description: 'Laptop kembali normal', status: '2' },
+  { id: 6, equipment_maintenance_request_id: 6, log: 'Laporan diterima', logged_by: idUserCitra, logged_at: '2026-06-10 12:00:00', verified_by: idDeni, verified_at: '2026-06-10 12:00:00', description: 'Proyektor akan diperiksa', status: '0' },
+  { id: 7, equipment_maintenance_request_id: 6, log: 'Proses pengecekan', logged_by: idUserDeni, logged_at: '2026-06-10 14:00:00', verified_by: idCitra, verified_at: '2026-06-10 14:00:00', description: 'Sedang dilakukan diagnosis kerusakan', status: '1' },
+  { id: 8, equipment_maintenance_request_id: 7, log: 'Laporan diterima', logged_by: idUserCitra, logged_at: '2026-06-15 10:00:00', verified_by: idDeni, verified_at: '2026-06-15 10:00:00', description: 'Menunggu penanganan teknisi', status: '0' },
+  { id: 9, equipment_maintenance_request_id: 8, log: 'Perbaikan dimulai', logged_by: idUserDeni, logged_at: '2026-06-18 14:00:00', verified_by: idCitra, verified_at: '2026-06-18 14:00:00', description: 'Pemeriksaan hardware dilakukan', status: '1' },
+  { id: 10, equipment_maintenance_request_id: 8, log: 'Perbaikan selesai', logged_by: idUserDeni, logged_at: '2026-06-19 15:00:00', verified_by: idCitra, verified_at: '2026-06-19 15:00:00', description: 'Komponen berhasil diganti', status: '2' }
+];
 
   for (const l of logs) {
     await db.query(
@@ -465,7 +567,7 @@ const idPengelola      = deni.id;
       [l.id, l.equipment_maintenance_request_id, l.log, l.logged_by, l.logged_at, l.verified_by, l.verified_at, l.description, l.status]
     );
   }
-  ok("5 Data Log Histori Tahapan Perbaikan berhasil ditambah.");
+  ok("10 Data Log Histori Tahapan Perbaikan berhasil ditambah.");
 }
 
 // ─── MAIN EXECUTION ───────────────────────────────────────────────────────────

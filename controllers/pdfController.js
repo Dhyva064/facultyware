@@ -29,21 +29,8 @@ function fmtDateTimePukul(d) {
   return `${tgl}\nPukul ${jam}`;
 }
 
-async function getReportedByEmployeeId(userId) {
-  let reportedByEmployeeId = userId;
-  const [[userAsEmployee]] = await db.query(
-    'SELECT id FROM employees WHERE id = ?',
-    [userId]
-  );
-
-  if (!userAsEmployee) {
-    const [[defaultEmployee]] = await db.query(
-      'SELECT id FROM employees LIMIT 1'
-    );
-    reportedByEmployeeId = defaultEmployee?.id || 1;
-  }
-
-  return reportedByEmployeeId;
+async function getReportedByUserId(userId) {
+  return userId || null;
 }
 
 function initDoc() {
@@ -231,22 +218,20 @@ const buktiLaporan = async (req, res, next) => {
   try {
     const userId = req.session.userId;
     const { id } = req.params;
-    const reportedByEmployeeId = await getReportedByEmployeeId(userId);
+    const reportedByUserId = await getReportedByUserId(userId);
 
     const [[laporan]] = await db.query(
       `SELECT emr.*, a.name AS equipment_name, a.code AS equipment_code,
-              COALESCE(e_reporter.name, ?) AS reported_by_name,
-              ? AS reported_by_email
+              u_reporter.name AS reported_by_name,
+              u_reporter.email AS reported_by_email
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
-       LEFT JOIN employees e_reporter ON emr.reported_by = e_reporter.id
+       JOIN users u_reporter ON emr.reported_by = u_reporter.id
        WHERE emr.id = ? AND emr.reported_by = ?`,
       [
-        req.session.username || 'Pengguna',
-        req.session.userEmail || '-',
         id,
-        reportedByEmployeeId
+        reportedByUserId
       ]
     );
 
@@ -540,12 +525,19 @@ const permohonanMaintenance = async (req, res, next) => {
       `SELECT emr.id, emr.issue_description, emr.status, emr.reported_at,
               a.name AS equipment_name, a.code AS equipment_code,
               u.name AS reported_by_name, u.email AS reported_by_email,
-              e.name AS assigned_employee_name
+              pengelola.name AS assigned_employee_name
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
        JOIN users u ON emr.reported_by = u.id
-       LEFT JOIN employees e ON emr.employee_id = e.id
+       LEFT JOIN (
+         SELECT e.id, e.name
+         FROM employees e
+         JOIN model_has_roles mhr ON e.id = mhr.model_id
+         JOIN roles r ON mhr.role_id = r.id
+         WHERE r.name = 'pengelola_aset'
+           AND mhr.model_type = 'App\\\\Models\\\\User'
+       ) pengelola ON emr.employee_id = pengelola.id
        WHERE emr.id = ?`,
       [id]
     );
@@ -638,12 +630,19 @@ const hasilPerbaikan = async (req, res, next) => {
       `SELECT emr.id, emr.issue_description, emr.status, emr.reported_at, emr.resolved_at,
               a.name AS equipment_name, a.code AS equipment_code,
               u.name AS reported_by_name,
-              e.name AS assigned_employee_name
+              pengelola.name AS assigned_employee_name
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
        JOIN users u ON emr.reported_by = u.id
-       LEFT JOIN employees e ON emr.employee_id = e.id
+       LEFT JOIN (
+         SELECT e.id, e.name
+         FROM employees e
+         JOIN model_has_roles mhr ON e.id = mhr.model_id
+         JOIN roles r ON mhr.role_id = r.id
+         WHERE r.name = 'pengelola_aset'
+           AND mhr.model_type = 'App\\\\Models\\\\User'
+       ) pengelola ON emr.employee_id = pengelola.id
        WHERE emr.id = ?`,
       [id]
     );
