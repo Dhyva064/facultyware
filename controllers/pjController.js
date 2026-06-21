@@ -28,7 +28,7 @@ const STATUS_INFO = {
   resolved:    { text: 'Selesai',    bg: '#f0fdf4', color: '#15803d',  border: '#bbf7d0' },
 };
 
-// GET /dashboard — Dashboard PJ
+// Menampilkan dashboard penanggung jawab
 const getDashboard = async (req, res, next) => {
   try {
     const currentFilter = req.query.filter === 'my' ? 'my' : 'all';
@@ -43,14 +43,12 @@ const getDashboard = async (req, res, next) => {
       `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${joinEq} ${baseWhere}`, params
     );
   
-    // MODIFIKASI: Mengubah query 'stats' sebelumnya menjadi 'rawStats'
     const [rawStats] = await db.query(
       `SELECT emr.status, COUNT(*) as total FROM equipment_maintenance_requests emr 
        ${joinEq} 
        ${baseWhere} GROUP BY emr.status`, params
     );
 
-    // MODIFIKASI: Memetakan rawStats ke dalam objek 'stats' agar langsung terbaca oleh home.ejs
     const stats = {
       menunggu: 0,
       dalamPengerjaan: 0,
@@ -92,7 +90,7 @@ const getDashboard = async (req, res, next) => {
       roleSummary:   'Meninjau pengajuan, memantau aset unit, dan menjalankan proses persetujuan yang menjadi kewenangan unit.',
       dashboardView: 'home',
       totalCount,
-      stats,             // MODIFIKASI: Sekarang mengirimkan objek format baru (menunggu, dalamPengerjaan, selesaiBulanIni)
+      stats,
       maintenanceCount,
       recentLaporan,
       currentFilter,
@@ -139,7 +137,10 @@ const index = async (req, res, next) => {
     const [laporan] = await db.query(
       `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
               u.name AS reported_by_name, emr.issue_description,
-              emr.status, emr.reported_at
+              emr.status, emr.reported_at,
+              (SELECT log FROM equipment_maintenance_request_log
+               WHERE equipment_maintenance_request_id = emr.id
+               ORDER BY created_at DESC, id DESC LIMIT 1) AS last_activity
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a      ON eq.asset_id       = a.id
@@ -195,7 +196,7 @@ const show = async (req, res, next) => {
       `SELECT emrl.*, u.name AS logged_by_name, ev.name AS verified_by_name
        FROM equipment_maintenance_request_log emrl
        LEFT JOIN users u ON emrl.logged_by = u.id
-       LEFT JOIN employees ev ON emrl.verified_by = ev.id
+       LEFT JOIN users ev ON emrl.verified_by = ev.id
        WHERE emrl.equipment_maintenance_request_id = ?
        ORDER BY emrl.created_at ASC, emrl.id ASC`,
       [id]

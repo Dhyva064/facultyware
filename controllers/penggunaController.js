@@ -53,16 +53,14 @@ async function getDefaultPengelola() {
      JOIN users u ON u.id = mhr.model_id
      WHERE r.name = 'pengelola_aset'
        AND mhr.model_type = 'App\\\\Models\\\\User'
-     ORDER BY e.id ASC
+     ORDER BY e.id ASC, u.id ASC
      LIMIT 1`
   );
 
   return pengelola || null;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /laporan — Daftar laporan kerusakan aset milik pengguna
-// ══════════════════════════════════════════════════════════════════════════════
+// Menampilkan daftar laporan milik pengguna
 const getList = async (req, res, next) => {
   try {
     const userId = await getUserId(req);
@@ -104,7 +102,10 @@ const getList = async (req, res, next) => {
       `SELECT emr.id, a.name AS equipment_name, a.code AS equipment_code,
               emr.issue_description, emr.status, emr.reported_at,
               (SELECT COUNT(*) FROM equipment_maintenance_request_log
-               WHERE equipment_maintenance_request_id = emr.id) AS log_count
+               WHERE equipment_maintenance_request_id = emr.id) AS log_count,
+              (SELECT log FROM equipment_maintenance_request_log
+               WHERE equipment_maintenance_request_id = emr.id
+               ORDER BY created_at DESC, id DESC LIMIT 1) AS last_activity
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
@@ -138,9 +139,7 @@ const getList = async (req, res, next) => {
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /laporan/buat — Form buat laporan kerusakan aset
-// ══════════════════════════════════════════════════════════════════════════════
+// Menampilkan form buat laporan kerusakan aset
 const getCreateForm = async (req, res, next) => {
   try {
     const userId = await getUserId(req);
@@ -173,9 +172,7 @@ const getCreateForm = async (req, res, next) => {
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// POST /laporan — Simpan laporan kerusakan aset baru
-// ══════════════════════════════════════════════════════════════════════════════
+// Menyimpan laporan kerusakan aset baru
 const postStore = async (req, res, next) => {
   try {
     const userId = await getUserId(req);
@@ -303,9 +300,7 @@ const postStore = async (req, res, next) => {
   }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /laporan/:id — Detail laporan kerusakan aset
-// ══════════════════════════════════════════════════════════════════════════════
+// Menampilkan detail laporan kerusakan aset
 const getDetail = async (req, res, next) => {
   try {
     const userId = await getUserId(req);
@@ -351,7 +346,7 @@ const getDetail = async (req, res, next) => {
               e.name AS verified_by_name
        FROM equipment_maintenance_request_log log
        LEFT JOIN users u ON log.logged_by = u.id
-       LEFT JOIN employees e ON log.verified_by = e.id
+       LEFT JOIN users e ON log.verified_by = e.id
        WHERE log.equipment_maintenance_request_id = ?
        ORDER BY log.created_at ASC, log.id ASC`,
       [laporanId]

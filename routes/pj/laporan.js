@@ -1,22 +1,9 @@
-const express    = require('express');
-const router     = express.Router();
+const express = require('express');
+const router = express.Router();
 
-const pjCtrl     = require('../../controllers/pjController');
-
-// [PRE-CONDITION]: Jalankan bypass/placeholder jika pdfController belum dibuat
-let pdfCtrl = {};
-try {
-  pdfCtrl = require('../../controllers/pdfController');
-} catch (e) {
-  console.log("💡 [SIMAINT INFO]: pdfController belum diimplementasikan, rute cetak PDF menggunakan callback pembantu.");
-  pdfCtrl.rekapBulanan    = (req, res) => res.send("Placeholder Rekap PDF Bulanan");
-  pdfCtrl.buktiLaporanPJ = (req, res) => res.send(`Placeholder Cetak PDF Laporan ID: ${req.params.id}`);
-}
-
-// Impor Middleware
+const pjCtrl = require('../../controllers/pjController');
+const pdfCtrl = require('../../controllers/pdfController');
 const { isAuthenticated } = require('../../middlewares/auth');
-// [TEST MODE] checkPermission dinonaktifkan sementara untuk pengujian login per-role
-// const { checkPermission } = require('../../middlewares/acl');
 
 router.use(isAuthenticated);
 

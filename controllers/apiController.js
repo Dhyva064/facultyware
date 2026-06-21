@@ -168,7 +168,7 @@ const getPengelolaMaintenanceById = async (req, res, next) => {
         COALESCE(petugas.name, verifier.name, '-') AS petugas
       FROM equipment_maintenance_request_log emrl
       LEFT JOIN users petugas ON emrl.logged_by = petugas.id
-      LEFT JOIN employees verifier ON emrl.verified_by = verifier.id
+      LEFT JOIN users verifier ON emrl.verified_by = verifier.id
       WHERE emrl.equipment_maintenance_request_id = ?
       ORDER BY emrl.created_at ASC, emrl.id ASC
     `, [id]);

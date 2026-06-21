@@ -3,14 +3,18 @@ const path = require('path');
 const multer = require('multer');
 
 const laporanUploadDir = path.join(__dirname, '../public/uploads/laporan');
+const progressUploadDir = path.join(__dirname, '../public/uploads/progress');
 
 if (!fs.existsSync(laporanUploadDir)) {
   fs.mkdirSync(laporanUploadDir, { recursive: true });
 }
+if (!fs.existsSync(progressUploadDir)) {
+  fs.mkdirSync(progressUploadDir, { recursive: true });
+}
 
-function makeStorage(prefix) {
+function makeStorage(prefix, destDir) {
   return multer.diskStorage({
-    destination: (req, file, cb) => cb(null, laporanUploadDir),
+    destination: (req, file, cb) => cb(null, destDir),
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
       const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -19,8 +23,8 @@ function makeStorage(prefix) {
   });
 }
 
-const storage = makeStorage('foto-kerusakan');
-const buktiHasilStorage = makeStorage('bukti-hasil-maintenance');
+const storage = makeStorage('foto-kerusakan', laporanUploadDir);
+const buktiHasilStorage = makeStorage('bukti-hasil-maintenance', progressUploadDir);
 
 const imageFileFilter = (message) => (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];

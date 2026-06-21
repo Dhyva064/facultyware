@@ -1,24 +1,10 @@
-const express    = require('express');
-const router     = express.Router();
+const express = require('express');
+const router = express.Router();
 
-// [PRE-CONDITION]: Jalankan bypass/placeholder jika maintenanceController belum dibuat
-let maintenanceCtrl = {};
-try {
-  maintenanceCtrl = require('../../controllers/maintenanceController');
-} catch (e) {
-  console.log("💡 [SIMAINT INFO]: maintenanceController belum dibuat, menggunakan callback pembantu agar app tidak crash.");
-  maintenanceCtrl.index  = (req, res) => res.send("Tampilan Daftar Permohonan Perbaikan Aktif");
-  maintenanceCtrl.create = (req, res) => res.send("Tampilan Form Buat Permohonan Perbaikan Baru");
-  maintenanceCtrl.store  = (req, res) => res.send("Proses Menyimpan Permohonan Perbaikan Baru");
-  maintenanceCtrl.show   = (req, res) => res.send(`Detail Log Penanganan Perbaikan ID: ${req.params.id}`);
-  maintenanceCtrl.close  = (req, res) => res.send(`Proses Penutupan Status Laporan ID: ${req.params.id}`);
-  maintenanceCtrl.revisi = (req, res) => res.send(`Proses Pengajuan Revisi Laporan ID: ${req.params.id}`);
-}
-
-// Impor Middleware
+const maintenanceCtrl = require('../../controllers/maintenanceController');
+const pdfCtrl = require('../../controllers/pdfController');
 const authModule = require('../../middlewares/auth');
 const { isAuthenticated } = authModule;
-// Gunakan fallback agar tidak crash jika acl belum ada
 const checkPermission = authModule.checkPermission || ((role) => (req, res, next) => next());
 
 router.use(isAuthenticated);
@@ -37,7 +23,7 @@ router.get('/',
 // GET  /PJ/MAINTENANCE/REKAP-PDF — Download Rekap Bulanan PDF
 router.get('/rekap-pdf',
   checkPermission('maintenance.view'),
-  maintenanceCtrl.downloadRekapBulanan
+  pdfCtrl.rekapBulanan
 );
 
 // GET  /PJ/MAINTENANCE/BUAT — Membuka form pengajuan perbaikan mandiri oleh PJ 

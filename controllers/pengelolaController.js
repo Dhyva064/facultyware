@@ -38,11 +38,10 @@ async function fetchLogs(laporanId) {
   const [logs] = await db.query(
     `SELECT emrl.*,
             u.name AS logged_by_name,
-            COALESCE(ev.name, uv.name) AS verified_by_name
+            ev.name AS verified_by_name
      FROM equipment_maintenance_request_log emrl
      LEFT JOIN users u ON emrl.logged_by = u.id
-     LEFT JOIN employees ev ON emrl.verified_by = ev.id
-     LEFT JOIN users uv ON emrl.verified_by = uv.id
+     LEFT JOIN users ev ON emrl.verified_by = ev.id
      WHERE emrl.equipment_maintenance_request_id = ?
      ORDER BY emrl.created_at ASC, emrl.id ASC`,
     [laporanId]
@@ -220,7 +219,7 @@ const updateProgress = async (req, res, next) => {
     }
 
     const logId = await nextLogId();
-    const photoPath = req.file ? `/uploads/laporan/${req.file.filename}` : null;
+    const photoPath = req.file ? `/uploads/progress/${req.file.filename}` : null;
     await db.query(
       `INSERT INTO equipment_maintenance_request_log
           (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, created_at, updated_at)

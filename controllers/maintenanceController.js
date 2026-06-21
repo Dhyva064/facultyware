@@ -64,7 +64,7 @@ const index = async (req, res, next) => {
                WHERE equipment_maintenance_request_id = emr.id) AS log_count,
               (SELECT log FROM equipment_maintenance_request_log
                WHERE equipment_maintenance_request_id = emr.id
-               ORDER BY created_at DESC, id DESC LIMIT 1) = 'Perbaikan dilakukan' AS has_update
+               ORDER BY created_at DESC, id DESC LIMIT 1) AS last_activity
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
@@ -201,7 +201,7 @@ const store = async (req, res, next) => {
       );
     }
 
-    // 1. Update status laporan awal menjadi 'in_progress' dan kaitkan dengan ID pengelola aset yang ditunjuk otomatis
+    // Ubah status jadi in_progress dan assign pengelola
     await db.query(
       `UPDATE equipment_maintenance_requests
        SET status = 'in_progress', employee_id = ?, updated_at = NOW()
@@ -405,156 +405,4 @@ const revisi = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GET /maintenance/rekap-pdf  — Generate PDF Rekap Bulanan
-// ══════════════════════════════════════════════════════════════════════════════
-const downloadRekapBulanan = async (req, res, next) => {
-  try {
-    const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
-    
-    res.setHeader('Content-disposition', 'attachment; filename="Rekap_Laporan_Maintenance_Bulanan.pdf"');
-    res.setHeader('Content-type', 'application/pdf');
-    doc.pipe(res);
-
-    // Header FTI
-    // Coba gunakan file logo yang sudah ada, misalnya logo_unand.png atau default hunvreus.png
-    let logoPath = path.join(__dirname, '../public/assets/images/logo_unand.png');
-    if (!fs.existsSync(logoPath)) {
-      // fallback if logo-unand is not present yet
-      logoPath = path.join(__dirname, '../public/assets/hunvreus.png');
-    }
-    
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 50, 45, { width: 60 });
-    }
-
-    doc.font('Times-Roman')
-       .fontSize(14)
-       .text('KEMENTERIAN PENDIDIKAN TINGGI, SAINS DAN TEKNOLOGI', 120, 45, { align: 'center' })
-       .text('UNIVERSITAS ANDALAS', 120, 60, { align: 'center' })
-       .font('Times-Bold')
-       .text('FAKULTAS TEKNOLOGI INFORMASI', 120, 75, { align: 'center' })
-       .font('Times-Roman')
-       .fontSize(10)
-       .text('Kampus Universitas Andalas, Limau Manis, Padang - 25163', 120, 90, { align: 'center' })
-       .text('website: http://fti.unand.ac.id email: sekretariat@it.unand.ac.id', 120, 105, { align: 'center' });
-
-    doc.moveTo(50, 125).lineTo(545, 125).lineWidth(2).stroke();
-    doc.moveTo(50, 128).lineTo(545, 128).lineWidth(1).stroke();
-    doc.moveDown(2);
-
-    // Title
-    doc.font('Helvetica-Bold').fontSize(14).text('REKAP LAPORAN MAINTENANCE PERALATAN BULANAN', { align: 'center' });
-    doc.moveDown(1.5);
-
-    // Fetch data
-    const [stats] = await db.query(`
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'reported' THEN 1 ELSE 0 END) as reported,
-        SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
-        SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved
-      FROM equipment_maintenance_requests
-      WHERE MONTH(reported_at) = MONTH(CURRENT_DATE()) AND YEAR(reported_at) = YEAR(CURRENT_DATE())
-    `);
-
-    doc.font('Helvetica-Bold').fontSize(11).text('Ringkasan Statistik Bulan Ini:', 50, doc.y);
-    doc.font('Helvetica').fontSize(10);
-    const statObj = stats[0] || { total:0, reported:0, in_progress:0, resolved:0 };
-    doc.text(`Total Laporan : ${statObj.total || 0}`);
-    doc.text(`Dilaporkan (reported) : ${statObj.reported || 0}`);
-    doc.text(`Dalam Proses (in_progress) : ${statObj.in_progress || 0}`);
-    doc.text(`Selesai (resolved) : ${statObj.resolved || 0}`);
-    doc.moveDown(1.5);
-
-    // Table Data
-    const [maintenance] = await db.query(`
-      SELECT emr.reported_at, a.code AS equipment_code, a.name AS equipment_name, eq.brand,
-             e_by.name AS pelapor_name, emr.status, emr.issue_description
-      FROM equipment_maintenance_requests emr
-      JOIN equipments eq ON emr.equipment_id = eq.id
-      JOIN assets a ON eq.asset_id = a.id
-      JOIN users e_by ON emr.reported_by = e_by.id
-      WHERE MONTH(emr.reported_at) = MONTH(CURRENT_DATE()) AND YEAR(emr.reported_at) = YEAR(CURRENT_DATE())
-      ORDER BY emr.reported_at DESC
-    `);
-
-    // Draw Table
-    const tableTop = doc.y;
-    const colWidths = [60, 70, 100, 70, 100, 70];
-    const headers = ['Tanggal', 'Kode Aset', 'Nama Aset', 'Merek', 'Pelapor', 'Status'];
-
-    let currentY = tableTop;
-    
-    // Function to check if page break is needed
-    const checkPageBreak = (height) => {
-        if (currentY + height > 750) {
-            doc.addPage();
-            currentY = 50;
-            return true;
-        }
-        return false;
-    };
-
-    doc.font('Helvetica-Bold').fontSize(9);
-    let startX = 50;
-    headers.forEach((h, i) => {
-       doc.text(h, startX, currentY);
-       startX += colWidths[i];
-    });
-    currentY += 15;
-    doc.moveTo(50, currentY).lineTo(545, currentY).lineWidth(1).stroke();
-    currentY += 5;
-
-    doc.font('Helvetica').fontSize(9);
-    maintenance.forEach(row => {
-       const tgl = new Date(row.reported_at).toLocaleDateString('id-ID');
-       const descText = `Deskripsi Kerusakan: ${row.issue_description || '-'}`;
-       const descHeight = doc.heightOfString(descText, { width: 495, fontSize: 8 });
-       
-       checkPageBreak(15 + descHeight + 15);
-
-       startX = 50;
-       doc.text(tgl, startX, currentY);
-       startX += colWidths[0];
-       
-       doc.text(row.equipment_code || '-', startX, currentY, { width: colWidths[1]-5 });
-       startX += colWidths[1];
-
-       doc.text(row.equipment_name || '-', startX, currentY, { width: colWidths[2]-5 });
-       startX += colWidths[2];
-
-       doc.text(row.brand || '-', startX, currentY, { width: colWidths[3]-5 });
-       startX += colWidths[3];
-
-       doc.text(row.pelapor_name || '-', startX, currentY, { width: colWidths[4]-5 });
-       startX += colWidths[4];
-
-       doc.text(row.status, startX, currentY, { width: colWidths[5]-5 });
-
-       currentY += 15;
-       doc.font('Helvetica-Oblique').fontSize(8);
-       doc.text(descText, 50, currentY, { width: 495 });
-       doc.font('Helvetica').fontSize(9);
-       
-       currentY += descHeight + 5;
-       doc.moveTo(50, currentY).lineTo(545, currentY).lineWidth(0.5).stroke();
-       currentY += 5;
-    });
-
-    // Add page numbers
-    const pages = doc.bufferedPageRange();
-    for (let i = 0; i < pages.count; i++) {
-      doc.switchToPage(i);
-      doc.font('Helvetica').fontSize(8);
-      const printDate = new Date().toLocaleString('id-ID');
-      doc.text(`Dicetak pada: ${printDate}`, 50, 780, { align: 'left' });
-      doc.text(`Halaman ${i + 1} dari ${pages.count}`, 50, 780, { align: 'right' });
-    }
-
-    doc.end();
-
-  } catch (err) { next(err); }
-};
-
-module.exports = { index, create, store, show, close, revisi, downloadRekapBulanan };
+module.exports = { index, create, store, show, close, revisi };
