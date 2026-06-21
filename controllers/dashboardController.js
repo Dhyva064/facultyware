@@ -10,7 +10,7 @@ const db = require("../lib/db");
  * Relasi DB yang benar (hasil inspeksi schema):
  *  - equipments.asset_id → assets.id  (nama alat ada di assets)
  *  - equipment_maintenance_requests.equipment_id → equipments.id
- *  - equipment_maintenance_requests.employee_id  → employees.id  (PJ/pengelola)
+ *  - equipment_maintenance_requests.employee_id  → employees.id  (pengelola aset)
  *  - equipment_maintenance_requests.reported_by  → users.id
  *  - rooms.responsible_employee_id → employees.id  (ruangan per PJ)
  *  - TIDAK ADA relasi langsung equipments → rooms
@@ -43,28 +43,19 @@ async function buildDashboardViewModel(req) {
   const currentFilter  = req.query.filter === 'my' ? 'my' : 'all';
 
   if (String(roleName || "").trim().toLowerCase().replace(/\s+/g, "_") === 'penanggung_jawab') {
-    // Cari employee_id dari user ini
-    const [[emp]] = await db.query(
-      'SELECT id FROM employees WHERE id = ? LIMIT 1', [userId]
-    );
-    const employeeId = emp ? emp.id : null;
-
     // --- Query dasar (semua laporan) ---
     let baseWhere  = '';
     let params     = [];
 
-    // Filter "my": tampilkan laporan yang assigned ke PJ ini
-    if (currentFilter === 'my' && employeeId) {
-      baseWhere = 'WHERE emr.employee_id = ?';
-      params    = [employeeId];
-    }
+    // PJ melihat semua laporan. employee_id pada request merepresentasikan Pengelola Aset,
+    // sehingga tidak boleh dipakai sebagai filter "laporan milik PJ".
 
     const [[{ total: tCount }]] = await db.query(
       `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${baseWhere}`, params
     );
     const [[{ total: mCount }]] = await db.query(
       `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${baseWhere}
-       ${baseWhere ? 'AND' : 'WHERE'} emr.status IN ('reported','in_progress')`, params
+       WHERE emr.status IN ('reported','in_progress')`, params
     );
     const [rLaporan] = await db.query(
       `SELECT emr.id, a.name AS equipment_name, u.name AS reported_by_name,
@@ -83,17 +74,17 @@ async function buildDashboardViewModel(req) {
 
     // Stats per-status (global atau filter my)
     const [[{ c: menunggu }]] = await db.query(
-      `SELECT COUNT(*) as c FROM equipment_maintenance_requests emr ${baseWhere}
-       ${baseWhere ? 'AND' : 'WHERE'} emr.status = 'reported'`, params
+      `SELECT COUNT(*) as c FROM equipment_maintenance_requests emr
+       WHERE emr.status = 'reported'`, params
     );
     const [[{ c: dalamPengerjaan }]] = await db.query(
-      `SELECT COUNT(*) as c FROM equipment_maintenance_requests emr ${baseWhere}
-       ${baseWhere ? 'AND' : 'WHERE'} emr.status = 'in_progress'`, params
+      `SELECT COUNT(*) as c FROM equipment_maintenance_requests emr
+       WHERE emr.status = 'in_progress'`, params
     );
     const [[{ c: selesaiBulanIni }]] = await db.query(
-      `SELECT COUNT(*) as c FROM equipment_maintenance_requests emr ${baseWhere}
-       ${baseWhere ? 'AND' : 'WHERE'} emr.status = 'resolved'
-         AND MONTH(emr.updated_at) = MONTH(NOW()) AND YEAR(emr.updated_at) = YEAR(NOW())`, params
+      `SELECT COUNT(*) as c FROM equipment_maintenance_requests emr
+       WHERE emr.status = 'resolved'
+         AND MONTH(emr.resolved_at) = MONTH(NOW()) AND YEAR(emr.resolved_at) = YEAR(NOW())`, params
     );
 
     stats = {

@@ -161,15 +161,16 @@ const getPengelolaMaintenanceById = async (req, res, next) => {
     const [logs] = await db.query(`
       SELECT
         emrl.id,
-        emrl.status,
-        emrl.log,
+        NULL AS status,
+        emrl.log AS activity_type,
         emrl.description AS deskripsi_progress,
-        emrl.logged_at AS tanggal_progress,
-        COALESCE(petugas.name, '-') AS petugas
+        COALESCE(emrl.logged_at, emrl.verified_at, emrl.created_at) AS tanggal_progress,
+        COALESCE(petugas.name, verifier.name, '-') AS petugas
       FROM equipment_maintenance_request_log emrl
       LEFT JOIN users petugas ON emrl.logged_by = petugas.id
+      LEFT JOIN employees verifier ON emrl.verified_by = verifier.id
       WHERE emrl.equipment_maintenance_request_id = ?
-      ORDER BY emrl.logged_at ASC, emrl.created_at ASC, emrl.id ASC
+      ORDER BY emrl.created_at ASC, emrl.id ASC
     `, [id]);
 
     return res.json({

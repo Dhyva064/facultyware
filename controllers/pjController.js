@@ -32,14 +32,11 @@ const STATUS_INFO = {
 const getDashboard = async (req, res, next) => {
   try {
     const currentFilter = req.query.filter === 'my' ? 'my' : 'all';
-    const pjEmployeeId  = await resolveEmployeeId(req);
 
     let baseWhere = '';
     let params    = [];
-    if (currentFilter === 'my' && pjEmployeeId) {
-      baseWhere = 'WHERE emr.employee_id = ?';
-      params    = [pjEmployeeId];
-    }
+    // PJ melihat semua laporan. employee_id pada request merepresentasikan Pengelola Aset,
+    // sehingga tidak boleh dipakai sebagai filter "laporan milik PJ".
     const joinEq = 'JOIN equipments eq ON emr.equipment_id = eq.id';
 
     const [[{ total: totalCount }]] = await db.query(
@@ -66,13 +63,13 @@ const getDashboard = async (req, res, next) => {
       if (row.status === 'resolved') stats.selesaiBulanIni = row.total;
     });
 
-    // PENGEMBALIAN: Menambahkan kembali query maintenanceCount yang sempat hilang di snippet Anda
+    // Menghitung laporan maintenance yang masih aktif (belum selesai)
     const [[{ total: maintenanceCount }]] = await db.query(
       `SELECT COUNT(*) as total FROM equipment_maintenance_requests emr ${joinEq}
-       ${baseWhere} AND emr.status IN ('reported','in_progress')`, params
+       WHERE emr.status IN ('reported','in_progress')`, params
     );
     
-    // MODIFIKASI: Pastikan list recent laporan juga terkunci untuk aset milik PJ ini
+    // List recent laporan mengikuti official status request, bukan status log timeline.
     const [recentLaporan] = await db.query(
       `SELECT emr.id, a.name AS equipment_name, u.name AS reported_by_name,
               emr.issue_description, emr.status, emr.reported_at
@@ -195,11 +192,12 @@ const show = async (req, res, next) => {
     }
 
     const [logs] = await db.query(
-      `SELECT emrl.*, u.name AS logged_by_name
+      `SELECT emrl.*, u.name AS logged_by_name, ev.name AS verified_by_name
        FROM equipment_maintenance_request_log emrl
        LEFT JOIN users u ON emrl.logged_by = u.id
+       LEFT JOIN employees ev ON emrl.verified_by = ev.id
        WHERE emrl.equipment_maintenance_request_id = ?
-       ORDER BY emrl.created_at ASC`,
+       ORDER BY emrl.created_at ASC, emrl.id ASC`,
       [id]
     );
 

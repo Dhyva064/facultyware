@@ -282,16 +282,14 @@ const postStore = async (req, res, next) => {
       [equipment_id, userId, issue_description.trim(), pengelola.employee_id]
     );
 
-    if (req.file) {
-      const logId = await nextLogId();
-      const photoPath = `/uploads/laporan/${req.file.filename}`;
-      await db.query(
-        `INSERT INTO equipment_maintenance_request_log
-           (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, status, created_at, updated_at)
-         VALUES (?, ?, 'Laporan dibuat', ?, NOW(), ?, 'Foto kerusakan diunggah oleh pengguna saat membuat laporan.', 1, NOW(), NOW())`,
-        [logId, result.insertId, pengelola.user_id, photoPath]
-      );
-    }
+    const logId = await nextLogId();
+    const photoPath = req.file ? `/uploads/laporan/${req.file.filename}` : null;
+    await db.query(
+      `INSERT INTO equipment_maintenance_request_log
+         (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, created_at, updated_at)
+       VALUES (?, ?, 'Laporan dibuat', ?, NOW(), ?, 'Laporan kerusakan aset dibuat oleh pengguna.', NOW(), NOW())`,
+      [logId, result.insertId, userId, photoPath]
+    );
 
     req.session.flash = {
       type: 'success',
@@ -345,14 +343,17 @@ const getDetail = async (req, res, next) => {
       });
     }
 
-    // Ambil log progres
+    // Ambil timeline aktivitas lengkap, bukan status resmi request.
     const [logs] = await db.query(
-      `SELECT log.id, log.status, log.description, log.created_at,
-              e.name AS updated_by
+      `SELECT log.id, log.log, log.description, log.log_file,
+              log.logged_at, log.verified_at, log.created_at,
+              u.name AS logged_by_name,
+              e.name AS verified_by_name
        FROM equipment_maintenance_request_log log
+       LEFT JOIN users u ON log.logged_by = u.id
        LEFT JOIN employees e ON log.verified_by = e.id
        WHERE log.equipment_maintenance_request_id = ?
-       ORDER BY log.created_at DESC`,
+       ORDER BY log.created_at ASC, log.id ASC`,
       [laporanId]
     );
 

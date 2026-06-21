@@ -56,6 +56,21 @@
       year: 'numeric'
     });
   }
+
+  function activityMeta(log) {
+    const map = {
+      'Laporan dibuat': { text:'Dilaporkan', icon:'📝', color:'#a16207' },
+      'Maintenance ditugaskan': { text:'Ditugaskan', icon:'⚙️', color:'#1d4ed8' },
+      'Perbaikan dilakukan': { text:'Bukti Perbaikan Diunggah', icon:'📷', color:'#7e22ce' },
+      'Revisi diminta': { text:'Revisi Diminta', icon:'🔄', color:'#c2410c' },
+      'Perbaikan disetujui': { text:'Selesai', icon:'✅', color:'#15803d' },
+    };
+    return map[log] || { text:log || 'Aktivitas', icon:'•', color:'#666' };
+  }
+
+  function activityActor(log) {
+    return log.logged_by_name || log.verified_by_name || '';
+  }
 %>
 
 <!-- Breadcrumb -->
@@ -131,12 +146,8 @@
       <% } else { %>
         <div style="position:relative;">
           <% _logs.forEach(function(log, idx) {
-            const statusMap = {
-              1: { text: 'Dilaporkan', icon: '📋', color: '#a16207' },
-              2: { text: 'Diproses', icon: '⚙️', color: '#1d4ed8' },
-              3: { text: 'Selesai', icon: '✓', color: '#15803d' }
-            };
-            const logStatus = statusMap[log.status] || { text: 'Unknown', icon: '?', color: '#666' };
+            const logStatus = activityMeta(log.log);
+            const actor = activityActor(log);
           %>
             <div style="display:flex;gap:16px;margin-bottom:<%= idx === _logs.length - 1 ? '0' : '20px' %>;">
               <div style="display:flex;flex-direction:column;align-items:center;">
@@ -150,16 +161,23 @@
               <div style="flex:1;padding-top:4px;">
                 <div style="font-weight:600;color:var(--foreground);"><%= logStatus.text %></div>
                 <div style="font-size:12px;color:var(--muted-foreground);margin-bottom:6px;">
-                  <%= formatDate(log.created_at) %>
+                  <%= formatDate(log.logged_at || log.verified_at || log.created_at) %>
                 </div>
-                <% if (log.notes) { %>
-                  <div style="font-size:13px;color:var(--foreground);background:var(--muted-background);padding:10px;border-radius:4px;margin-top:8px;border-left:3px solid <%= logStatus.color %>;">
-                    <%= log.notes %>
+                <% if (log.description) { %>
+                  <div style="font-size:13px;color:var(--foreground);background:var(--muted);padding:10px;border-radius:4px;margin-top:8px;border-left:3px solid <%= logStatus.color %>;white-space:pre-wrap;">
+                    <%= log.description %>
                   </div>
                 <% } %>
-                <% if (log.updated_by) { %>
+                <% if (log.log_file) { %>
+                  <div style="margin-top:10px;">
+                    <a href="<%= log.log_file %>" target="_blank" style="display:inline-block;border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+                      <img src="<%= log.log_file %>" alt="Foto bukti maintenance" style="max-width:260px;max-height:170px;object-fit:cover;display:block;" onerror="this.parentElement.style.display='none'"/>
+                    </a>
+                  </div>
+                <% } %>
+                <% if (actor) { %>
                   <div style="font-size:12px;color:var(--muted-foreground);margin-top:8px;">
-                    Oleh: <strong><%= log.updated_by %></strong>
+                    Oleh: <strong><%= actor %></strong>
                   </div>
                 <% } %>
               </div>

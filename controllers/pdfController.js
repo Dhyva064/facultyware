@@ -57,12 +57,12 @@ const STATUS_LABEL = {
   resolved:    'Terselesaikan',
 };
 
-const LOG_STATUS_LABEL = {
-  1: 'Laporan Dibuat',
-  2: 'Diterima',
-  3: 'Progres Perbaikan',
-  4: 'Revisi',
-  5: 'Selesai',
+const LOG_ACTIVITY_LABEL = {
+  'Laporan dibuat': 'Dilaporkan',
+  'Maintenance ditugaskan': 'Ditugaskan',
+  'Perbaikan dilakukan': 'Bukti Perbaikan Diunggah',
+  'Revisi diminta': 'Revisi Diminta',
+  'Perbaikan disetujui': 'Selesai',
 };
 
 // ── PDF Builder Helpers ────────────────────────────────────────────────────────
@@ -243,16 +243,16 @@ const buktiLaporan = async (req, res, next) => {
     }
 
     const [logs] = await db.query(
-      `SELECT emrl.logged_at, emrl.log, emrl.description, emrl.status, emrl.log_file,
+      `SELECT emrl.logged_at, emrl.log, emrl.description, emrl.log_file,
               u.name AS logged_by_name
        FROM equipment_maintenance_request_log emrl
        LEFT JOIN users u ON emrl.logged_by = u.id
        WHERE emrl.equipment_maintenance_request_id = ?
-       ORDER BY emrl.created_at ASC`,
+       ORDER BY emrl.created_at ASC, emrl.id ASC`,
       [id]
     );
 
-    const initialLog = logs.find(lg => Number(lg.status) === 1 && lg.log_file && lg.log_file !== '-');
+    const initialLog = logs.find(lg => lg.log === 'Laporan dibuat' && lg.log_file && lg.log_file !== '-');
     const photoUrl = initialLog && initialLog.log_file ? initialLog.log_file : null;
     const imgPath = photoUrl ? path.join(__dirname, '../public', photoUrl.replace(/^\/+/, '')) : null;
     const hasPhoto = imgPath && fs.existsSync(imgPath);
@@ -551,8 +551,8 @@ const permohonanMaintenance = async (req, res, next) => {
 
     const [[firstLog]] = await db.query(
       `SELECT logged_at FROM equipment_maintenance_request_log
-       WHERE equipment_maintenance_request_id = ? AND status = 1
-       ORDER BY created_at ASC LIMIT 1`,
+       WHERE equipment_maintenance_request_id = ? AND log = 'Laporan dibuat'
+       ORDER BY created_at ASC, id ASC LIMIT 1`,
       [id]
     );
 
@@ -664,15 +664,15 @@ const hasilPerbaikan = async (req, res, next) => {
 
     const [progres] = await db.query(
       `SELECT emrl.log, emrl.description, emrl.log_file, emrl.logged_at,
-              emrl.status, u.name AS logged_by_name
+              u.name AS logged_by_name
        FROM equipment_maintenance_request_log emrl
        LEFT JOIN users u ON emrl.logged_by = u.id
        WHERE emrl.equipment_maintenance_request_id = ?
-       ORDER BY emrl.created_at ASC`,
+       ORDER BY emrl.created_at ASC, emrl.id ASC`,
       [id]
     );
 
-    const progresOnly = progres.filter(p => p.status === 3);
+    const progresOnly = progres.filter(p => p.log === 'Perbaikan dilakukan');
 
     const doc = initDoc();
     const filename = `hasil-perbaikan-PNT-${String(id).padStart(5, '0')}.pdf`;
@@ -794,12 +794,12 @@ const buktiLaporanPJ = async (req, res, next) => {
     }
 
     const [logs] = await db.query(
-      `SELECT emrl.logged_at, emrl.log, emrl.description, emrl.status,
+      `SELECT emrl.logged_at, emrl.log, emrl.description,
               u.name AS logged_by_name
        FROM equipment_maintenance_request_log emrl
        LEFT JOIN users u ON emrl.logged_by = u.id
        WHERE emrl.equipment_maintenance_request_id = ?
-       ORDER BY emrl.created_at ASC`,
+       ORDER BY emrl.created_at ASC, emrl.id ASC`,
       [id]
     );
 
@@ -870,7 +870,7 @@ const buktiLaporanPJ = async (req, res, next) => {
         if (doc.y !== tY) tY = doc.y;
         const row = [
           fmtDateTime(lg.logged_at),
-          `${LOG_STATUS_LABEL[lg.status] || '-'}\n${lg.log || ''}`,
+          `${LOG_ACTIVITY_LABEL[lg.log] || lg.log || '-'}`,
           lg.description || '-',
           lg.logged_by_name || '-',
         ];

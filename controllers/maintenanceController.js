@@ -62,9 +62,9 @@ const index = async (req, res, next) => {
               pengelola.name AS pengelola_name,
               (SELECT COUNT(*) FROM equipment_maintenance_request_log
                WHERE equipment_maintenance_request_id = emr.id) AS log_count,
-              (SELECT status FROM equipment_maintenance_request_log
+              (SELECT log FROM equipment_maintenance_request_log
                WHERE equipment_maintenance_request_id = emr.id
-               ORDER BY created_at DESC, id DESC LIMIT 1) = 3 AS has_update
+               ORDER BY created_at DESC, id DESC LIMIT 1) = 'Perbaikan dilakukan' AS has_update
        FROM equipment_maintenance_requests emr
        JOIN equipments eq ON emr.equipment_id = eq.id
        JOIN assets a ON eq.asset_id = a.id
@@ -185,7 +185,7 @@ const store = async (req, res, next) => {
     }
 
     const [[pengelola]] = await db.query(
-      `SELECT e.id
+      `SELECT e.id, e.name
        FROM employees e
        JOIN model_has_roles mhr ON e.id = mhr.model_id
        JOIN roles r ON mhr.role_id = r.id
@@ -209,14 +209,14 @@ const store = async (req, res, next) => {
       [pengelola.id, laporan_id]
     );
 
-    // 2. Insert log historis penugasan (status = 1: Created/Dilaporkan)
+    // 2. Insert log historis penugasan sebagai activity timeline.
     // Catatan: kolom `log` di DB varchar(45) — judul singkat saja; detail ke `description`
     const logId = await nextLogId();
     await db.query(
       `INSERT INTO equipment_maintenance_request_log
-          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
-       VALUES (?, ?, 'Permohonan maintenance dibuat', ?, NOW(), 'Permohonan dibuat otomatis oleh Penanggung Jawab', 1, NOW(), NOW())`,
-      [logId, laporan_id, pjEmployeeId]
+          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, created_at, updated_at)
+       VALUES (?, ?, 'Maintenance ditugaskan', ?, NOW(), ?, NOW(), NOW())`,
+      [logId, laporan_id, pjEmployeeId, `Ditugaskan ke ${pengelola.name}`]
     );
 
     req.session.flash = { type: 'success', message: 'Permohonan maintenance berhasil dibuat.' };
@@ -264,16 +264,16 @@ const show = async (req, res, next) => {
       `SELECT emrl.*, e.name AS logged_by_name, ev.name AS verified_by_name
        FROM equipment_maintenance_request_log emrl
        LEFT JOIN users e  ON emrl.logged_by   = e.id
-       LEFT JOIN users ev ON emrl.verified_by = ev.id
+       LEFT JOIN employees ev ON emrl.verified_by = ev.id
        WHERE emrl.equipment_maintenance_request_id = ?
-       ORDER BY emrl.created_at ASC`,
+       ORDER BY emrl.created_at ASC, emrl.id ASC`,
       [id]
     );
 
-    // Cek status log progres untuk kontrol validasi tombol aksi (status 3 = Progress Update dari Pengelola Aset)
-    const hasProgress = logs.some(lg => lg.status === 3);
+    // Cek activity progress untuk kontrol validasi tombol aksi PJ.
+    const hasProgress = logs.some(lg => lg.log === 'Perbaikan dilakukan');
     const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
-    const canAction = lastLog && lastLog.status === 3;
+    const canAction = lastLog && lastLog.log === 'Perbaikan dilakukan';
 
     const flash = req.session.flash || null;
     delete req.session.flash;
@@ -311,15 +311,15 @@ const close = async (req, res, next) => {
       return res.redirect('/maintenance');
     }
 
-    // Validasi: Status log terakhir wajib bernilai 3
+    // Validasi: activity terakhir wajib berupa bukti perbaikan dari Pengelola Aset.
     const [latestLogs] = await db.query(
-      `SELECT status FROM equipment_maintenance_request_log
+      `SELECT log FROM equipment_maintenance_request_log
        WHERE equipment_maintenance_request_id = ?
        ORDER BY created_at DESC, id DESC LIMIT 1`,
       [id]
     );
     const lastLog = latestLogs.length > 0 ? latestLogs[0] : null;
-    if (!lastLog || lastLog.status !== 3) {
+    if (!lastLog || lastLog.log !== 'Perbaikan dilakukan') {
       req.session.flash = {
         type: 'error',
         message: 'Permohonan tidak dapat ditutup. Menunggu konfirmasi penyelesaian atau update progres baru dari pihak pengelola.',
@@ -335,12 +335,12 @@ const close = async (req, res, next) => {
       [id]
     );
 
-    // Kirim entri log final penutupan laporan (status 5 = Resolved/Closed)
+    // Kirim entri log approval; status resmi tetap berada di tabel request.
     const logId = await nextLogId();
     await db.query(
       `INSERT INTO equipment_maintenance_request_log
-          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
-       VALUES (?, ?, 'Permohonan ditutup', ?, NOW(), 'Disetujui dan ditutup oleh Penanggung Jawab', 5, NOW(), NOW())`,
+          (id, equipment_maintenance_request_id, log, verified_by, verified_at, description, created_at, updated_at)
+       VALUES (?, ?, 'Perbaikan disetujui', ?, NOW(), 'Perbaikan telah sesuai', NOW(), NOW())`,
       [logId, id, pjEmployeeId]
     );
 
@@ -367,13 +367,13 @@ const revisi = async (req, res, next) => {
 
   try {
     const [latestLogs] = await db.query(
-      `SELECT status FROM equipment_maintenance_request_log
+      `SELECT log FROM equipment_maintenance_request_log
        WHERE equipment_maintenance_request_id = ?
        ORDER BY created_at DESC, id DESC LIMIT 1`,
       [id]
     );
     const lastLog = latestLogs.length > 0 ? latestLogs[0] : null;
-    if (!lastLog || lastLog.status !== 3) {
+    if (!lastLog || lastLog.log !== 'Perbaikan dilakukan') {
       req.session.flash = {
         type: 'error',
         message: 'Tidak dapat meminta revisi. Log terakhir harus berupa klaim progres dari pengelola.',
@@ -391,12 +391,12 @@ const revisi = async (req, res, next) => {
       return res.redirect('/maintenance');
     }
 
-    // Menyisipkan log baru dengan status 4 (Revision Requested) tanpa mengubah status global 'in_progress' pada tabel utama
+    // Menyisipkan log revisi baru tanpa mengubah status resmi request.
     const logId = await nextLogId();
     await db.query(
       `INSERT INTO equipment_maintenance_request_log
-          (id, equipment_maintenance_request_id, log, logged_by, logged_at, description, status, created_at, updated_at)
-       VALUES (?, ?, 'Revisi diminta', ?, NOW(), ?, 4, NOW(), NOW())`,
+          (id, equipment_maintenance_request_id, log, verified_by, verified_at, description, created_at, updated_at)
+       VALUES (?, ?, 'Revisi diminta', ?, NOW(), ?, NOW(), NOW())`,
       [logId, id, pjEmployeeId, catatan.trim()]
     );
 

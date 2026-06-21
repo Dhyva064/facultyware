@@ -544,30 +544,53 @@ const idDeni      = deni.id;
   ok("8 Data Induk Permohonan Perbaikan Aset ditambah.");
 
   const logs = [
-  // ===== MEI =====
-  { id: 1, equipment_maintenance_request_id: 1, log: 'Laporan diterima', logged_by: idUserCitra, logged_at: '2026-05-09 16:00:00', verified_by: idDeni, verified_at: '2026-05-09 16:00:00', description: 'Menunggu pemeriksaan', status: '0' },
-  { id: 2, equipment_maintenance_request_id: 2, log: 'Laporan printer', logged_by: idUserCitra, logged_at: '2026-05-12 11:00:00', verified_by: idDeni, verified_at: '2026-05-12 11:00:00', description: 'Kerusakan teridentifikasi', status: '0' },
-  { id: 3, equipment_maintenance_request_id: 3, log: 'Perbaikan laptop', logged_by: idUserDeni, logged_at: '2026-05-15 10:00:00', verified_by: idCitra, verified_at: '2026-05-15 10:00:00', description: 'Penggantian komponen sedang berlangsung', status: '1' },
-  { id: 4, equipment_maintenance_request_id: 4, log: 'Perbaikan AC', logged_by: idUserDeni, logged_at: '2026-05-20 15:30:00', verified_by: idCitra, verified_at: '2026-05-20 15:30:00', description: 'Pembersihan evaporator dan freon', status: '1' },
+    { id: 1, equipment_maintenance_request_id: 1, log: 'Laporan dibuat', logged_by: idSiti, logged_at: '2026-05-09 15:50:02', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+    { id: 2, equipment_maintenance_request_id: 2, log: 'Laporan dibuat', logged_by: idRiri, logged_at: '2026-05-12 10:30:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
 
-  // ===== JUNI =====
-  { id: 5, equipment_maintenance_request_id: 5, log: 'Perbaikan selesai', logged_by: idUserDeni, logged_at: '2026-06-04 09:00:00', verified_by: idCitra, verified_at: '2026-06-04 09:00:00', description: 'Laptop kembali normal', status: '2' },
-  { id: 6, equipment_maintenance_request_id: 6, log: 'Laporan diterima', logged_by: idUserCitra, logged_at: '2026-06-10 12:00:00', verified_by: idDeni, verified_at: '2026-06-10 12:00:00', description: 'Proyektor akan diperiksa', status: '0' },
-  { id: 7, equipment_maintenance_request_id: 6, log: 'Proses pengecekan', logged_by: idUserDeni, logged_at: '2026-06-10 14:00:00', verified_by: idCitra, verified_at: '2026-06-10 14:00:00', description: 'Sedang dilakukan diagnosis kerusakan', status: '1' },
-  { id: 8, equipment_maintenance_request_id: 7, log: 'Laporan diterima', logged_by: idUserCitra, logged_at: '2026-06-15 10:00:00', verified_by: idDeni, verified_at: '2026-06-15 10:00:00', description: 'Menunggu penanganan teknisi', status: '0' },
-  { id: 9, equipment_maintenance_request_id: 8, log: 'Perbaikan dimulai', logged_by: idUserDeni, logged_at: '2026-06-18 14:00:00', verified_by: idCitra, verified_at: '2026-06-18 14:00:00', description: 'Pemeriksaan hardware dilakukan', status: '1' },
-  { id: 10, equipment_maintenance_request_id: 8, log: 'Perbaikan selesai', logged_by: idUserDeni, logged_at: '2026-06-19 15:00:00', verified_by: idCitra, verified_at: '2026-06-19 15:00:00', description: 'Komponen berhasil diganti', status: '2' }
-];
+    { id: 3, equipment_maintenance_request_id: 3, log: 'Laporan dibuat', logged_by: idSiti, logged_at: '2026-05-15 09:15:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+    { id: 4, equipment_maintenance_request_id: 3, log: 'Maintenance ditugaskan', logged_by: idUserCitra, logged_at: '2026-05-15 09:35:00', description: 'Ditugaskan ke Deni Saputra' },
+    { id: 5, equipment_maintenance_request_id: 3, log: 'Perbaikan dilakukan', logged_by: idUserDeni, logged_at: '2026-05-15 10:00:00', log_file: '/uploads/laporan/foto-laptop-1.jpg', description: 'Penggantian komponen sedang berlangsung' },
+
+    { id: 6, equipment_maintenance_request_id: 4, log: 'Laporan dibuat', logged_by: idRiri, logged_at: '2026-05-20 14:45:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+    { id: 7, equipment_maintenance_request_id: 4, log: 'Maintenance ditugaskan', logged_by: idUserCitra, logged_at: '2026-05-20 15:00:00', description: 'Ditugaskan ke Deni Saputra' },
+    { id: 8, equipment_maintenance_request_id: 4, log: 'Perbaikan dilakukan', logged_by: idUserDeni, logged_at: '2026-05-20 15:30:00', log_file: '/uploads/laporan/foto-ac-1.jpg', description: 'Pembersihan evaporator dan pengecekan freon' },
+    { id: 9, equipment_maintenance_request_id: 4, log: 'Revisi diminta', verified_by: idCitra, verified_at: '2026-05-20 16:00:00', description: 'Foto hasil perbaikan kurang jelas' },
+
+    { id: 10, equipment_maintenance_request_id: 5, log: 'Laporan dibuat', logged_by: idSiti, logged_at: '2026-06-03 08:00:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+    { id: 11, equipment_maintenance_request_id: 5, log: 'Maintenance ditugaskan', logged_by: idUserCitra, logged_at: '2026-06-03 08:30:00', description: 'Ditugaskan ke Deni Saputra' },
+    { id: 12, equipment_maintenance_request_id: 5, log: 'Perbaikan dilakukan', logged_by: idUserDeni, logged_at: '2026-06-04 09:00:00', log_file: '/uploads/laporan/foto-laptop-2.jpg', description: 'Laptop kembali normal setelah pembersihan dan optimasi sistem' },
+    { id: 13, equipment_maintenance_request_id: 5, log: 'Perbaikan disetujui', verified_by: idCitra, verified_at: '2026-06-04 15:26:00', description: 'Perbaikan telah sesuai' },
+
+    { id: 14, equipment_maintenance_request_id: 6, log: 'Laporan dibuat', logged_by: idRiri, logged_at: '2026-06-10 11:00:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+    { id: 15, equipment_maintenance_request_id: 7, log: 'Laporan dibuat', logged_by: idSiti, logged_at: '2026-06-15 09:30:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+
+    { id: 16, equipment_maintenance_request_id: 8, log: 'Laporan dibuat', logged_by: idRiri, logged_at: '2026-06-18 13:00:00', description: 'Laporan kerusakan aset dibuat oleh pengguna.' },
+    { id: 17, equipment_maintenance_request_id: 8, log: 'Maintenance ditugaskan', logged_by: idUserCitra, logged_at: '2026-06-18 13:20:00', description: 'Ditugaskan ke Deni Saputra' },
+    { id: 18, equipment_maintenance_request_id: 8, log: 'Perbaikan dilakukan', logged_by: idUserDeni, logged_at: '2026-06-18 14:00:00', log_file: '/uploads/laporan/foto-keyboard-1.jpg', description: 'Pemeriksaan keyboard dan pembersihan konektor dilakukan' },
+    { id: 19, equipment_maintenance_request_id: 8, log: 'Revisi diminta', verified_by: idCitra, verified_at: '2026-06-18 14:30:00', description: 'Kabel fleksibel masih belum rapi' },
+    { id: 20, equipment_maintenance_request_id: 8, log: 'Perbaikan dilakukan', logged_by: idUserDeni, logged_at: '2026-06-19 09:00:00', log_file: '/uploads/laporan/foto-keyboard-2.jpg', description: 'Upload ulang foto setelah perapian kabel fleksibel' },
+    { id: 21, equipment_maintenance_request_id: 8, log: 'Perbaikan disetujui', verified_by: idCitra, verified_at: '2026-06-19 15:00:00', description: 'Perbaikan telah sesuai' },
+  ];
 
   for (const l of logs) {
     await db.query(
       `INSERT INTO equipment_maintenance_request_log 
-         (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, verified_by, verified_at, verification_file, description, status, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, '-', ?, ?, '-', ?, ?, NOW(), NOW())`,
-      [l.id, l.equipment_maintenance_request_id, l.log, l.logged_by, l.logged_at, l.verified_by, l.verified_at, l.description, l.status]
+         (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, verified_by, verified_at, verification_file, description, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '-', ?, NOW(), NOW())`,
+      [
+        l.id,
+        l.equipment_maintenance_request_id,
+        l.log,
+        l.logged_by || null,
+        l.logged_at || null,
+        l.log_file || null,
+        l.verified_by || null,
+        l.verified_at || null,
+        l.description || null,
+      ]
     );
   }
-  ok("10 Data Log Histori Tahapan Perbaikan berhasil ditambah.");
+  ok("21 Data Log Histori Tahapan Perbaikan berhasil ditambah.");
 }
 
 // ─── MAIN EXECUTION ───────────────────────────────────────────────────────────

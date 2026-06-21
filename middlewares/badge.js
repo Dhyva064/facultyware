@@ -23,42 +23,40 @@ async function badgeMiddleware(req, res, next) {
     );
     const employeeId = emp ? emp.id : null;
 
-    if (role === 'penanggung_jawab' && employeeId) {
-      // Hitung laporan 'reported' yang ditugaskan ke PJ ini
+    if (role === 'penanggung_jawab') {
+      // Hitung semua laporan berstatus 'reported' yang belum diproses (PJ melihat semua, bukan filtered per employee)
       const [[{ n }]] = await db.query(
         `SELECT COUNT(*) AS n
          FROM equipment_maintenance_requests emr
-         WHERE emr.status = 'reported'
-           AND emr.employee_id = ?`,
-        [employeeId]
+         WHERE emr.status = 'reported'`
       );
       counts.newLaporan = n || 0;
 
-      // Hitung permohonan maintenance yang memiliki update baru (status log terakhir = 3)
+      // Hitung permohonan maintenance yang activity terakhirnya perlu ditinjau PJ (semua, bukan per employee).
       const [[{ n: nMaint }]] = await db.query(
         `SELECT COUNT(*) AS n
          FROM equipment_maintenance_requests emr
-         WHERE emr.employee_id = ?
+         WHERE emr.status = 'in_progress'
            AND (
-             SELECT status FROM equipment_maintenance_request_log
+             SELECT log FROM equipment_maintenance_request_log
              WHERE equipment_maintenance_request_id = emr.id
              ORDER BY created_at DESC, id DESC LIMIT 1
-           ) = 3`,
-        [employeeId]
+           ) = 'Perbaikan dilakukan'`
       );
       counts.newMaintenance = nMaint || 0;
 
     } else if (role === 'pengelola_aset' && employeeId) {
-      // Hitung penugasan in_progress yang belum ada log progres (status=3)
+      // Hitung penugasan in_progress yang menunggu aksi Pengelola Aset.
       const [[{ n }]] = await db.query(
         `SELECT COUNT(*) AS n
          FROM equipment_maintenance_requests emr
          WHERE emr.status = 'in_progress'
            AND emr.employee_id = ?
-           AND NOT EXISTS (
-             SELECT 1 FROM equipment_maintenance_request_log
-             WHERE equipment_maintenance_request_id = emr.id AND status = 3
-           )`,
+           AND COALESCE((
+             SELECT log FROM equipment_maintenance_request_log
+             WHERE equipment_maintenance_request_id = emr.id
+             ORDER BY created_at DESC, id DESC LIMIT 1
+           ), 'Maintenance ditugaskan') IN ('Maintenance ditugaskan', 'Revisi diminta')`,
         [employeeId]
       );
       counts.newTugas = n || 0;

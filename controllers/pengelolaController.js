@@ -113,9 +113,9 @@ async function listAssignments(req, status, view, title, currentPath) {
             u_reporter.name AS reported_by_name,
             (SELECT COUNT(*) FROM equipment_maintenance_request_log
              WHERE equipment_maintenance_request_id = emr.id) AS log_count,
-            (SELECT status FROM equipment_maintenance_request_log
+            (SELECT log FROM equipment_maintenance_request_log
              WHERE equipment_maintenance_request_id = emr.id
-             ORDER BY created_at DESC, id DESC LIMIT 1) AS last_log_status
+             ORDER BY created_at DESC, id DESC LIMIT 1) AS last_activity
      FROM equipment_maintenance_requests emr
      JOIN equipments eq ON emr.equipment_id = eq.id
      JOIN assets a ON eq.asset_id = a.id
@@ -189,7 +189,6 @@ const updateProgress = async (req, res, next) => {
   try {
     const employeeId = await getEmployeeId(req);
     const { id } = req.params;
-    const logTitle = String(req.body.log || '').trim();
     const description = String(req.body.description || '').trim();
 
     if (req.fileValidationError) {
@@ -201,11 +200,11 @@ const updateProgress = async (req, res, next) => {
       return res.redirect(`/penugasan/${id}`);
     }
 
-    if (logTitle.length < 5 || description.length < 10) {
+    if (description.length < 10) {
       cleanupUploadedFile(req.file);
       req.session.flash = {
         type: 'error',
-        message: 'Judul minimal 5 karakter dan catatan progres minimal 10 karakter.',
+        message: 'Catatan progres minimal 10 karakter.',
       };
       return res.redirect(`/penugasan/${id}`);
     }
@@ -224,9 +223,9 @@ const updateProgress = async (req, res, next) => {
     const photoPath = req.file ? `/uploads/laporan/${req.file.filename}` : null;
     await db.query(
       `INSERT INTO equipment_maintenance_request_log
-          (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NOW(), ?, ?, 3, NOW(), NOW())`,
-      [logId, id, logTitle.substring(0, 45), req.session.userId, photoPath, description]
+          (id, equipment_maintenance_request_id, log, logged_by, logged_at, log_file, description, created_at, updated_at)
+       VALUES (?, ?, 'Perbaikan dilakukan', ?, NOW(), ?, ?, NOW(), NOW())`,
+      [logId, id, req.session.userId, photoPath, description]
     );
 
     await db.query(
