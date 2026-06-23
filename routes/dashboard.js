@@ -6,10 +6,8 @@ const dashboardController = require('../controllers/dashboardController');
 
 // Mengimpor middleware
 const { isAuthenticated } = require('../middlewares/auth');
-// [TEST MODE] checkPermission dinonaktifkan sementara untuk pengujian login per-role
-// const { checkPermission } = require('../middlewares/acl');
+const { checkPermission } = require('../middlewares/acl');
 
-// [TEST MODE] checkPermission('dashboard.view') dinonaktifkan → hanya isAuthenticated
-router.get('/', isAuthenticated, dashboardController.home);
+router.get('/', isAuthenticated, checkPermission('dashboard.view'), dashboardController.home);
 
 module.exports = router;
