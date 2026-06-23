@@ -35,19 +35,12 @@ async function getReportedByUserId(userId) {
 
 function initDoc() {
   const doc = new PDFDocument({ margin: 40, bufferPages: true, size: 'A4' });
-  // Font fallback jika font tidak ditemukan
-  try {
-    doc.registerFont('Cambria', 'C:\\Windows\\Fonts\\cambria.ttc', 'Cambria');
-    doc.registerFont('Cambria-Bold', 'C:\\Windows\\Fonts\\cambriab.ttf');
-    doc.registerFont('Cambria-Italic', 'C:\\Windows\\Fonts\\cambriai.ttf');
-    doc.registerFont('Cambria-BoldItalic', 'C:\\Windows\\Fonts\\cambriaz.ttf');
-  } catch (err) {
-    // Fallback to standard fonts if Windows fonts are missing
-    doc.registerFont('Cambria', 'Helvetica');
-    doc.registerFont('Cambria-Bold', 'Helvetica-Bold');
-    doc.registerFont('Cambria-Italic', 'Helvetica-Oblique');
-    doc.registerFont('Cambria-BoldItalic', 'Helvetica-BoldOblique');
-  }
+
+  doc.registerFont('Cambria', 'Helvetica');
+  doc.registerFont('Cambria-Bold', 'Helvetica-Bold');
+  doc.registerFont('Cambria-Italic', 'Helvetica-Oblique');
+  doc.registerFont('Cambria-BoldItalic', 'Helvetica-BoldOblique');
+
   return doc;
 }
 
