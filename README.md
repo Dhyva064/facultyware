@@ -151,7 +151,7 @@ npx playwright test tests/api.spec.js              # REST API
 npx playwright test tests/error-handling.spec.js   # Error Handling 
 
 # Lihat laporan hasil test dalam format HTML
-npm run test:report
+npx playwright show-report
 ```
 
 **Hasil Testing:** 45/45 test passed ✅ (Browser: Chromium)
