@@ -161,7 +161,7 @@ npm run test:report
 ## Pembagian Tugas Anggota
 
 | No | Nama | NIM | Fitur yang Dikerjakan | Status |
-|----|------|-----|-------------------------------|
+|----|------|-----|-----------------------|--------|
 | 1 | Akbar Rivan Putra | 2411522011 | Pengguna dapat mengisi form laporan kerusakan aset | ✅ |
 | 2 | Akbar Rivan Putra | 2411522011 | Pengguna dapat melihat status laporan secara real-time | ✅ |
 | 3 | Akbar Rivan Putra | 2411522011 | Pengguna dapat memfilter riwayat laporan berdasarkan status | ✅ |
