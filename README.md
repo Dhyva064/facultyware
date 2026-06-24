@@ -62,7 +62,7 @@ Pastikan perangkat Anda telah terinstall:
 
 ```bash
 git clone https://github.com/Dhyva064/facultyware.git
-cd nama-repo
+cd facultyware
 ```
 
 **2. Install dependencies**
