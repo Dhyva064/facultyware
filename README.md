@@ -81,7 +81,7 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=facultyware
-SESSION_SECRET= your_session_secret_key
+SESSION_SECRET= 
 ```
 
 **4. Siapkan database**
